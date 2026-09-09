@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "description": "The community home for the Agent Hook Spec.",
   "scripts": {
-    "validate": "node scripts/validate.mjs",
+    "validate": "node scripts/validate.mjs && node scripts/validate-image-size-patch.mjs",
     "build": "npm --prefix website run build",
     "start": "npm --prefix website run start"
   },

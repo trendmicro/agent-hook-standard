@@ -19,6 +19,7 @@
     "react-dom": "^19.0.0"
   },
   "overrides": {
+    "image-size": "file:../vendor/image-size",
     "qs": "6.16.0",
     "serialize-javascript": "7.1.1",
     "uuid": "11.1.1"
