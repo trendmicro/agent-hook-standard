@@ -3,14 +3,13 @@ import type { Config } from '@docusaurus/types';
 const repository = process.env.GITHUB_REPOSITORY ?? 'trendmicro/agent-hook-standard';
 const [organizationName, projectName] = repository.split('/');
 const repositoryUrl = `https://github.com/${repository}`;
-const isUserSite = projectName === `${organizationName}.github.io`;
 
 const config: Config = {
   title: 'Agent Hook Spec',
   tagline: 'A portable lifecycle-hook protocol for AI agents and tooling',
   favicon: 'img/favicon.svg',
   url: `https://${organizationName}.github.io`,
-  baseUrl: isUserSite ? '/' : `/${projectName}/`,
+  baseUrl: '/',
   organizationName,
   projectName,
   trailingSlash: false,
