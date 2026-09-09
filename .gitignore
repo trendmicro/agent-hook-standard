@@ -1,0 +1,5 @@
+node_modules/
+website/build/
+website/.docusaurus/
+coverage/
+.DS_Store

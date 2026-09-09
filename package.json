@@ -1,0 +1,20 @@
+{
+  "name": "agent-hook-spec",
+  "private": true,
+  "version": "0.0.0",
+  "description": "The community home for the Agent Hook Spec.",
+  "workspaces": [
+    "website"
+  ],
+  "scripts": {
+    "validate": "node scripts/validate.mjs",
+    "build": "npm run build --workspace=website",
+    "start": "npm run start --workspace=website"
+  },
+  "devDependencies": {
+    "ajv": "^8.17.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

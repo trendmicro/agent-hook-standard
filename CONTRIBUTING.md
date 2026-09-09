@@ -13,18 +13,25 @@ and fixes.
 - If your change adds or updates third-party material, make sure its license is
   compatible with this repository.
 
-## Reporting issues and proposing changes
+## Discussing ideas and reporting issues
 
-Use the GitHub issue tracker to report an error, suggest an improvement, or
-propose a feature. Please include enough detail for maintainers to understand
-and reproduce the issue or evaluate the proposal. Helpful details include:
+Use [GitHub Discussions](https://github.com/trendmicro/agent-hook-standard/discussions)
+for questions, ideas, use cases, and proposed changes to the Agent Hook Spec.
+Start a discussion before drafting an RFC so the community can help shape the
+proposal.
+
+Use GitHub Issues only for reproducible repository defects, such as a broken
+link, invalid fixture, build failure, or problem with this website. Include
+enough detail for maintainers to understand and reproduce the problem. Helpful
+details include:
 
 - The affected file, section, schema field, or example.
 - What you expected and what you observed.
 - A concise proposed correction or use case, where applicable.
 
-For substantial changes to the schema or its semantics, open an issue first so
-that maintainers and contributors can discuss the approach before implementation.
+For substantial changes to the protocol, schema, or semantics, follow the RFC
+process in [GOVERNANCE.md](GOVERNANCE.md). A formal RFC pull request must link
+to its prior GitHub Discussion.
 
 ## Contributing changes
 
@@ -36,13 +43,15 @@ that maintainers and contributors can discuss the approach before implementation
 
    ```sh
    npm ci
-   npm test
+   npm run validate
+   npm run build
    ```
 
 5. Commit with a clear, meaningful message.
 6. Push the branch to your fork.
 7. Open a pull request against this repository. Explain what changed, why it is
-   needed, and how you validated it. Link the related issue when one exists.
+   needed, and how you validated it. Link the related Discussion, Issue, or RFC
+   when one exists.
 
 ## Pull request expectations
 
