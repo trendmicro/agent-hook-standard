@@ -21,6 +21,15 @@ to help shape it.
 - [`examples/`](examples/README.md) — illustrative integrations.
 - [`website/`](website/) — Docusaurus source for the GitHub Pages site.
 
+## Local setup
+
+Install the validator and website dependencies separately:
+
+```sh
+npm ci
+npm ci --prefix website
+```
+
 ## Participate
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before contributing. The decision
