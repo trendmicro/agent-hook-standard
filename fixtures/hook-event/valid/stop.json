@@ -1,0 +1,11 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "dac1a092-1121-4e95-a542-b3dccb0a2f4b",
+  "hook_event_name": "Stop",
+  "session_id": "session-42",
+  "timestamp": "2026-09-09T10:15:34Z",
+  "sequence": 11,
+  "cwd": "/workspace/project",
+  "prompt_id": "prompt-17",
+  "outcome": "success"
+}

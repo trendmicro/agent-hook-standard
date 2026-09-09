@@ -1,0 +1,14 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "f9c74d10-f408-448d-9579-7ddab4245388",
+  "hook_event_name": "SubagentStop",
+  "session_id": "session-42",
+  "timestamp": "2026-09-09T10:15:30Z",
+  "sequence": 10,
+  "cwd": "/workspace/project",
+  "prompt_id": "prompt-17",
+  "delegation_id": "delegation-17",
+  "agent_id": "subagent-17",
+  "agent_type": "Explore",
+  "outcome": "success"
+}

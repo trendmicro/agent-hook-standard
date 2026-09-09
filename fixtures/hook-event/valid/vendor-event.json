@@ -1,10 +1,9 @@
 {
-  "hook_version": "0.1",
-  "event_id": "3c6477d4-f95c-4c45-b601-46e652956a54",
-  "event_type": "com.example.agent.prompt.expanded",
-  "timestamp": "2026-09-09T10:16:00.125Z",
-  "context": {},
-  "payload": {
-    "native_event": "PromptExpanded"
-  }
+  "spec": "agent-hooks/0.1",
+  "event_id": "6706d7e5-8efa-49f2-a8a1-4b19c0b216c8",
+  "hook_event_name": "x-example/PromptExpanded",
+  "session_id": "session-42",
+  "timestamp": "2026-09-09T10:16:01Z",
+  "sequence": 13,
+  "native_event": "PromptExpanded"
 }

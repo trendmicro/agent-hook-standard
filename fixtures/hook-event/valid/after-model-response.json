@@ -1,0 +1,21 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "51ad25cc-a1a6-4acb-9531-ae50a9b0bceb",
+  "hook_event_name": "AfterModelResponse",
+  "session_id": "session-42",
+  "timestamp": "2026-09-09T10:15:12Z",
+  "sequence": 3,
+  "cwd": "/workspace/project",
+  "prompt_id": "prompt-17",
+  "model_request_id": "modelreq-17",
+  "model": "claude-opus-5",
+  "outcome": "success",
+  "response": {
+    "content": "I will run the status check.",
+    "finish_reason": "tool_use"
+  },
+  "usage": {
+    "input_tokens": 52,
+    "output_tokens": 11
+  }
+}

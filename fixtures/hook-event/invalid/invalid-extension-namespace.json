@@ -1,10 +1,16 @@
 {
-  "hook_version": "0.1",
+  "spec": "agent-hooks/0.1",
   "event_id": "6edab8d4-1bb3-4c37-bd6c-7ad7da707b7a",
-  "event_type": "agent-hook.tool.pre",
+  "hook_event_name": "PreToolUse",
+  "session_id": "session-42",
   "timestamp": "2026-09-09T10:15:30Z",
-  "context": {},
-  "payload": {},
+  "sequence": 4,
+  "prompt_id": "prompt-17",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "git status --short"
+  },
+  "tool_use_id": "toolu-17",
   "extensions": {
     "policy": {
       "enabled": true

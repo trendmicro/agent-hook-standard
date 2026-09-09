@@ -1,0 +1,14 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "b1a3d2e8-b5f8-4e0e-b1d9-78de90d370f5",
+  "hook_event_name": "PermissionDenied",
+  "session_id": "session-42",
+  "timestamp": "2026-09-09T10:15:18Z",
+  "sequence": 6,
+  "cwd": "/workspace/project",
+  "prompt_id": "prompt-17",
+  "permission_request_id": "permission-17",
+  "operation_id": "operation-17",
+  "reason": "Command execution requires approval.",
+  "denied_by": "policy"
+}

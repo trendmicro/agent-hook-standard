@@ -1,4 +1,7 @@
 {
-  "hook_version": "0.1",
-  "decision": "allow"
+  "spec": "agent-hooks/0.1",
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow"
+  }
 }

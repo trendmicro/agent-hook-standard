@@ -1,0 +1,20 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "7a83870b-fd4b-4f44-a49e-cc2e2511e5ff",
+  "hook_event_name": "PostToolUse",
+  "session_id": "session-42",
+  "timestamp": "2026-09-09T10:15:20Z",
+  "sequence": 7,
+  "cwd": "/workspace/project",
+  "prompt_id": "prompt-17",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "git status --short"
+  },
+  "tool_response": {
+    "stdout": "",
+    "exit_code": 0
+  },
+  "tool_use_id": "toolu-17",
+  "duration_ms": 53
+}

@@ -1,25 +1,24 @@
 # Post-tool audit event
 
-This non-normative example records a successful tool invocation without
-attempting to control it. A decision in a response to `agent-hook.tool.post` is
-ignored by the protocol, so the handler returns annotations only.
+This non-normative example records a successful tool invocation after it has
+completed. `PostToolUse` is an Observe event, so the handler returns
+correlated metadata rather than a control response.
 
 Event delivered by the adapter:
 
 ```json
 {
-  "hook_version": "0.1",
+  "spec": "agent-hooks/0.1",
   "event_id": "862a966f-6f7b-4c15-a8c5-40df353eeaac",
-  "event_type": "agent-hook.tool.post",
+  "hook_event_name": "PostToolUse",
+  "session_id": "session-42",
   "timestamp": "2026-09-09T10:17:00Z",
-  "context": { "session_id": "session-42" },
-  "payload": {
-    "tool_call_id": "call-17",
-    "tool": {
-      "name": "shell",
-      "output": { "exit_code": 0 }
-    }
-  }
+  "sequence": 17,
+  "prompt_id": "prompt-7",
+  "tool_name": "shell",
+  "tool_input": { "command": "git status --short" },
+  "tool_response": { "exit_code": 0 },
+  "tool_use_id": "toolu-17"
 }
 ```
 
@@ -27,10 +26,10 @@ Response from the audit handler:
 
 ```json
 {
-  "hook_version": "0.1",
+  "spec": "agent-hooks/0.1",
   "event_id": "862a966f-6f7b-4c15-a8c5-40df353eeaac",
-  "annotations": {
-    "audit_status": "recorded",
+  "metadata": {
+    "audit_id": "audit-20260909-17",
     "retention_class": "30d"
   }
 }

@@ -1,1 +1,193 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://trendmicro.github.io/agent-hook-standard/schemas/0.1/hook-response.schema.json","title":"Agent Hook 0.1 Response","description":"A correlated response to a portable Agent Hook 0.1 lifecycle event.","type":"object","additionalProperties":false,"required":["hook_version","event_id"],"properties":{"hook_version":{"const":"0.1"},"event_id":{"type":"string","pattern":"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"},"decision":{"enum":["allow","deny","ask"]},"reason":{"type":"string","minLength":1},"annotations":{"type":"object","additionalProperties":true},"extensions":{"$ref":"#/$defs/extensions"}},"allOf":[{"if":{"required":["decision"],"properties":{"decision":{"enum":["deny","ask"]}}},"then":{"required":["reason"]}}],"$defs":{"extensions":{"type":"object","propertyNames":{"pattern":"^(?:[a-z][a-z0-9-]*\\.)+[a-z][a-z0-9-]*$"},"additionalProperties":true}}}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trendmicro.github.io/agent-hook-standard/schemas/0.1/hook-response.schema.json",
+  "title": "Agent Hook 0.1 Response",
+  "description": "A correlated Claude Code-shaped response to an Agent Hook 0.1 request.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "spec",
+    "event_id"
+  ],
+  "properties": {
+    "spec": {
+      "const": "agent-hooks/0.1"
+    },
+    "event_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "continue": {
+      "type": "boolean"
+    },
+    "stopReason": {
+      "type": "string"
+    },
+    "systemMessage": {
+      "type": "string"
+    },
+    "terminalSequence": {
+      "type": "string"
+    },
+    "suppressOutput": {
+      "type": "boolean"
+    },
+    "async": {
+      "const": true
+    },
+    "asyncTimeout": {
+      "type": "number",
+      "minimum": 0
+    },
+    "decision": {
+      "const": "block"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hookSpecificOutput": {
+      "$ref": "#/$defs/HookSpecificOutput"
+    },
+    "metadata": {
+      "$ref": "#/$defs/ResponseMetadata"
+    },
+    "extensions": {
+      "$ref": "#/$defs/Extensions"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "decision"
+        ]
+      },
+      "then": {
+        "required": [
+          "reason"
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "Uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+    },
+    "EventName": {
+      "anyOf": [
+        {
+          "enum": [
+            "SessionStart",
+            "UserPromptSubmit",
+            "BeforeModelRequest",
+            "AfterModelResponse",
+            "PreToolUse",
+            "PermissionRequest",
+            "PermissionDenied",
+            "PostToolUse",
+            "PostToolUseFailure",
+            "SubagentStart",
+            "SubagentStop",
+            "Stop",
+            "SessionEnd"
+          ]
+        },
+        {
+          "type": "string",
+          "pattern": "^x-[a-z][a-z0-9-]*/[A-Z][A-Za-z0-9]*$"
+        }
+      ]
+    },
+    "Extensions": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^(?:[a-z][a-z0-9-]*\\.)+[a-z][a-z0-9-]*$"
+      },
+      "additionalProperties": true
+    },
+    "ResponseMetadata": {
+      "type": "object",
+      "properties": {
+        "audit_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "latency_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "triggered_rules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "HookSpecificOutput": {
+      "type": "object",
+      "properties": {
+        "hookEventName": {
+          "$ref": "#/$defs/EventName"
+        },
+        "permissionDecision": {
+          "enum": [
+            "allow",
+            "deny",
+            "ask",
+            "defer"
+          ]
+        },
+        "permissionDecisionReason": {
+          "type": "string"
+        },
+        "updatedInput": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "updatedMessages": {
+          "type": "array",
+          "items": {}
+        },
+        "additionalContext": {
+          "type": "string"
+        },
+        "decision": {
+          "type": "object",
+          "properties": {
+            "behavior": {
+              "enum": [
+                "allow",
+                "deny"
+              ]
+            },
+            "updatedInput": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "updatedPermissions": {
+              "type": "array",
+              "items": {}
+            },
+            "message": {
+              "type": "string"
+            },
+            "interrupt": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "behavior"
+          ],
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "hookEventName"
+      ],
+      "additionalProperties": true
+    }
+  }
+}

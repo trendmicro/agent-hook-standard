@@ -1,0 +1,19 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "9bc1db77-460b-4208-9a3b-164e0189c1e3",
+  "hook_event_name": "PostToolUseFailure",
+  "session_id": "session-42",
+  "timestamp": "2026-09-09T10:15:21Z",
+  "sequence": 8,
+  "cwd": "/workspace/project",
+  "prompt_id": "prompt-17",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "false"
+  },
+  "tool_use_id": "toolu-18",
+  "error": {
+    "type": "exit_status",
+    "message": "Command returned 1."
+  }
+}

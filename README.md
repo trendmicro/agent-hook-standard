@@ -2,7 +2,16 @@
 
 Agent Hook Spec is a community effort to define a portable lifecycle-hook
 protocol for AI agents and their tooling. It will let agent builders describe
-events, hook payloads, and hook responses using a shared, interoperable model.
+events, hook payloads, hook responses, and security telemetry using a shared,
+interoperable model.
+
+The 0.1 draft defines thirteen canonical Core `hook_event_name` values across
+session and turn lifecycle, user prompts, model requests and responses, tool
+use, permission outcomes, and subagent delegation. Hosts publish the Core
+boundaries and gate behavior they can observe and enforce faithfully. Each
+per-event capability claim is `gate`, `observe`, `partial`, or `unavailable`;
+an unavailable claim is not evidence that the underlying activity did not
+occur.
 
 ## Status
 

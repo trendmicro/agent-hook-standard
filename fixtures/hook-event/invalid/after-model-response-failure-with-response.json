@@ -1,0 +1,18 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "96090b9c-a4d8-49b8-a3e0-ed41917bce79",
+  "hook_event_name": "AfterModelResponse",
+  "session_id": "session-42",
+  "timestamp": "2026-09-09T10:15:12Z",
+  "sequence": 3,
+  "prompt_id": "prompt-17",
+  "model_request_id": "modelreq-17",
+  "model": "claude-opus-5",
+  "outcome": "failure",
+  "response": {
+    "content": "Partial."
+  },
+  "error": {
+    "type": "provider_error"
+  }
+}

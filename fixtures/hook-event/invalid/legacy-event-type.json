@@ -1,7 +1,8 @@
 {
-  "spec": "agent-hooks/0.2",
+  "spec": "agent-hooks/0.1",
   "event_id": "6edab8d4-1bb3-4c37-bd6c-7ad7da707b7a",
   "hook_event_name": "PreToolUse",
+  "event_type": "agent-hook.tool.pre",
   "session_id": "session-42",
   "timestamp": "2026-09-09T10:15:30Z",
   "sequence": 4,

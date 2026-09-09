@@ -15,10 +15,10 @@ superseded-by: []
 ## Summary
 
 This RFC proposes Agent Hook 0.1, a portable JSON contract for lifecycle-hook
-events and hook responses. It defines a small native envelope, a starter event
-registry, decision semantics, JSON Schemas, fixtures, and adapter guidance.
-It does not standardize native settings files, discovery locations, matcher
-languages, handler ordering, or execution transports.
+events and hook responses. It defines a native envelope, a 13-event Core
+registry for security telemetry, decision semantics, JSON Schemas, fixtures,
+and adapter guidance. It does not standardize native settings files, discovery
+locations, matcher languages, handler ordering, or execution transports.
 
 ## Motivation
 
@@ -27,6 +27,12 @@ and workflow automation. Claude Code, Cursor, and Gemini all expose useful
 lifecycle and tool boundaries, but their event names, payload shapes,
 configuration, and response conventions differ. An integration therefore needs
 one implementation per runtime even when its intended policy is identical.
+
+A security control also needs to reconstruct the sequence of meaningful agent
+activity: what entered the agent, what was sent to and received from a model,
+what operation was proposed or performed, what approval was requested or
+denied, and which work was delegated. A session and tool-only vocabulary cannot
+make those distinctions portable.
 
 The common boundary is an event delivered to a handler and a structured result
 returned by that handler. Standardizing that boundary permits runtimes to build
@@ -53,41 +59,70 @@ architecture.
 Adopt the normative documents in [`../spec/0.1/`](../spec/0.1/) and the
 machine-readable schemas in [`../schemas/`](../schemas/). Agent Hook 0.1:
 
-1. Defines `hook_version`, `event_id`, `event_type`, `timestamp`, `context`,
-   and `payload` as the required event envelope members.
-2. Defines `hook_version` and `event_id` as the required response members, and
-   `allow`, `deny`, and `ask` as optional decisions.
-3. Starts with five core events: session started/ended and tool pre/post/failed.
-4. Defines `deny` and `ask` only for decision-capable pre-action events; all
-   other events are observational.
+1. Defines `spec`, `event_id`, `hook_event_name`, `session_id`, `timestamp`,
+   and `sequence` as the required request-envelope members. `cwd` and
+   `transcript_path` are optional contextual members and SHOULD be supplied
+   when available.
+2. Defines `spec` and `event_id` as the required members of a correlated
+   response, retaining Claude-shaped, event-specific control members rather than
+   a universal decision enum.
+3. Defines thirteen case-sensitive Core `hook_event_name` values:
+   `SessionStart`, `UserPromptSubmit`, `BeforeModelRequest`, `AfterModelResponse`,
+   `PreToolUse`, `PermissionRequest`, `PermissionDenied`, `PostToolUse`,
+   `PostToolUseFailure`, `SubagentStart`, `SubagentStop`, `Stop`, and
+   `SessionEnd`.
+4. Defines `UserPromptSubmit`, `BeforeModelRequest`, `PreToolUse`, and
+   `PermissionRequest` as decision-capable pre-action events; all other Core
+   events are observational.
 5. Makes failed, timed-out, absent, and invalid hook responses fail open.
 6. Reserves extensions for vendor-specific names and data, with adapter
    guidance rather than configuration-file compatibility claims.
+7. Requires a per-host capability declaration for every Core event, using
+   `gate`, `observe`, `partial`, or `unavailable`, so security telemetry
+   consumers can interpret gaps without treating them as negative observations.
 
-The initial registry is intentionally small and may be amended through future
-RFCs after implementer review.
+The Core registry is deliberately limited to the boundaries needed to describe
+agent activity, model inference, tool execution, authorization, and
+delegation. Additional lifecycle events remain available through the extension
+mechanism and may be promoted through future RFCs after implementer review.
 
 ## Compatibility impact
 
 Existing native hook configurations remain valid and unchanged. They do not
 validate as Agent Hook configuration, because configuration and handler
 selection are out of scope. Adapters translate native events and responses to
-the Agent Hook contract; the included Claude Code, Cursor, and Gemini mapping
-is illustrative, not a compatibility guarantee for a particular product
-release.
+the Agent Hook contract; the included Claude Code reference mapping is
+illustrative, not a compatibility guarantee for a particular product release.
+
+This draft replaces the earlier five-event, `event_type` vocabulary before
+acceptance. A host MUST use the canonical, case-sensitive `hook_event_name`
+when it maps a corresponding Core boundary, and MUST omit a mapping it cannot
+implement faithfully. Its per-event capability declaration uses `gate`,
+`observe`, `partial`, or `unavailable` to distinguish an unsupported or
+observe-only boundary from a missing lifecycle occurrence. The draft does not
+require a host to fabricate model, permission, or delegation hooks that its
+native facility does not expose.
 
 ## Security and privacy impact
 
-The proposal permits a hook to request `allow`, `deny`, or `ask`, which makes
-the host responsible for preserving policy authority. An `allow` result never
-overrides host, organization, sandbox, or administrative policy. An `ask`
-result must reach a native approval mechanism or be denied in a non-interactive
-host. Event payloads may contain prompts, paths, tool arguments, outputs, and
-credentials; adapters and handlers must treat them as untrusted sensitive data.
+The proposal defines event-specific control responses, which makes the host
+responsible for preserving policy authority. A response that permits an operation
+never overrides host, organization, sandbox, or administrative policy. A response
+that requests approval must reach a native approval mechanism or be denied in a
+non-interactive host. Event payloads may contain prompts, paths, tool arguments,
+outputs, and credentials; adapters and handlers must treat them as untrusted
+sensitive data.
 
 The default on handler failure is intentionally fail open for availability. A
 runtime that requires fail-closed enforcement must use a native policy feature
 or define a future, explicitly configured profile.
+
+The Core registry supports security telemetry without requiring raw sensitive
+payloads to be retained. Implementations should preserve the available session,
+model-request, tool-use, permission-request, operation, and delegation
+correlation identifiers, then apply data minimization and redaction before
+exporting or persisting records. A denied operation and a failed completed
+operation are distinct security facts and are represented by distinct events.
 
 ## Alternatives considered
 
@@ -99,9 +134,13 @@ or define a future, explicitly configured profile.
   differ across runtimes.
 - **Observation-only hooks.** Rejected because pre-action policy decisions are
   a primary cross-runtime use case.
-- **A broad lifecycle registry.** Deferred so the first interoperable surface
-  can be validated before standardizing model, prompt, filesystem, task, and
-  worktree events.
+- **A five-event session-and-tool registry.** Rejected because it cannot
+  reconstruct model egress, authorization outcomes, user ingress, or delegated
+  work for security telemetry.
+- **Require every host to emit every Core event.** Rejected because native hook
+  coverage differs materially across hosts. Capability declarations make each
+  host's observable and enforceable surface explicit without fabricating
+  equivalence.
 
 ## Acceptance checklist
 
