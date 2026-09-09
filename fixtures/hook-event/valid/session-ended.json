@@ -1,0 +1,12 @@
+{
+  "hook_version": "0.1",
+  "event_id": "862a966f-6f7b-4c15-a8c5-40df353eeaac",
+  "event_type": "agent-hook.session.ended",
+  "timestamp": "2026-09-09T10:17:00+00:00",
+  "context": {
+    "session_id": "session-42"
+  },
+  "payload": {
+    "reason": "user_exit"
+  }
+}

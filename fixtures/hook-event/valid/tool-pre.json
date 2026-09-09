@@ -1,0 +1,27 @@
+{
+  "hook_version": "0.1",
+  "event_id": "6edab8d4-1bb3-4c37-bd6c-7ad7da707b7a",
+  "event_type": "agent-hook.tool.pre",
+  "timestamp": "2026-09-09T10:15:30Z",
+  "context": {
+    "session_id": "session-42",
+    "agent_id": "main",
+    "workspace": {
+      "cwd": "/workspace/project"
+    }
+  },
+  "payload": {
+    "tool_call_id": "call-17",
+    "tool": {
+      "name": "shell",
+      "input": {
+        "command": "git status --short"
+      }
+    }
+  },
+  "extensions": {
+    "com.example.policy": {
+      "classification": "internal"
+    }
+  }
+}

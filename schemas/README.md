@@ -1,7 +1,8 @@
 # Schemas
 
-This directory will contain the machine-readable JSON Schemas for accepted
-Agent Hook Spec versions. Each schema must declare JSON Schema Draft 2020-12,
+This directory contains machine-readable JSON Schemas for Agent Hook Spec
+versions. The 0.1 draft defines `hook-event.schema.json` and
+`hook-response.schema.json`. Each schema declares JSON Schema Draft 2020-12,
 a stable `$id`, and a descriptive `title`.
 
 Place a schema at `schemas/<name>.schema.json`. Pair it with fixtures at

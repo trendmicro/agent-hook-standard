@@ -1,0 +1,10 @@
+{
+  "hook_version": "0.1",
+  "event_id": "3c6477d4-f95c-4c45-b601-46e652956a54",
+  "event_type": "com.example.agent.prompt.expanded",
+  "timestamp": "2026-09-09T10:16:00.125Z",
+  "context": {},
+  "payload": {
+    "native_event": "PromptExpanded"
+  }
+}

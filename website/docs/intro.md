@@ -11,9 +11,15 @@ for builders to expose compatible events, payloads, and hook responses.
 
 ## Current status
 
-The project is a scaffold. There is **no active protocol specification yet**.
-The community will establish the protocol through public Discussions and the
-formal RFC process.
+The repository contains an adoption-ready **Agent Hook 0.1 draft** proposed by
+RFC 0001. It defines a portable event and response contract, schemas, fixtures,
+examples, and adapter guidance. It is not active until accepted through the
+public RFC process.
+
+The draft intentionally standardizes neither settings-file formats nor handler
+execution. Agent runtimes can map their native hooks to the shared event
+contract without giving up their own discovery, matching, trust, and policy
+models.
 
 ## Get involved
 

@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trendmicro.github.io/agent-hook-standard/schemas/0.1/hook-event.schema.json",
+  "title": "Agent Hook 0.1 Event",
+  "description": "A portable Agent Hook 0.1 lifecycle event.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "hook_version",
+    "event_id",
+    "event_type",
+    "timestamp",
+    "context",
+    "payload"
+  ],
+  "properties": {
+    "hook_version": {
+      "const": "0.1"
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+    },
+    "event_type": {
+      "type": "string",
+      "anyOf": [
+        {
+          "enum": [
+            "agent-hook.session.started",
+            "agent-hook.session.ended",
+            "agent-hook.tool.pre",
+            "agent-hook.tool.post",
+            "agent-hook.tool.failed"
+          ]
+        },
+        {
+          "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*){2,}$"
+        }
+      ]
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?(?:Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "agent_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workspace": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "payload": {
+      "type": "object"
+    },
+    "extensions": {
+      "$ref": "#/$defs/extensions"
+    }
+  },
+  "$defs": {
+    "extensions": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^(?:[a-z][a-z0-9-]*\\.)+[a-z][a-z0-9-]*$"
+      },
+      "additionalProperties": true
+    }
+  }
+}

@@ -1,7 +1,7 @@
 # Fixtures
 
-Fixtures prove the expected behavior of schemas accepted by the Agent Hook
-Spec. There are no fixtures until the first schema is adopted.
+Fixtures prove the expected behavior of Agent Hook schemas. The 0.1 draft
+includes fixtures for `hook-event` and `hook-response`.
 
 For `schemas/<name>.schema.json`, create JSON payloads in:
 

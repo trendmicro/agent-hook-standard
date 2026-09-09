@@ -1,0 +1,7 @@
+{
+  "hook_version": "0.1",
+  "event_type": "agent-hook.tool.pre",
+  "timestamp": "2026-09-09T10:15:30Z",
+  "context": {},
+  "payload": {}
+}

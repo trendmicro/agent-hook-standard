@@ -6,18 +6,19 @@ events, hook payloads, and hook responses using a shared, interoperable model.
 
 ## Status
 
-This repository is a scaffold: there is no active protocol specification yet.
-The first normative content will be proposed and adopted through the RFC
-process. Join the [GitHub Discussions](https://github.com/trendmicro/agent-hook-standard/discussions)
+The repository contains an adoption-ready Agent Hook 0.1 draft proposed by
+[RFC 0001](rfcs/0001-agent-hook-core-event-contract.md). It is not active until
+accepted through the RFC process. Join the
+[GitHub Discussions](https://github.com/trendmicro/agent-hook-standard/discussions)
 to help shape it.
 
 ## Repository map
 
 - [`rfcs/`](rfcs/README.md) — proposal process and formal RFCs.
 - [`spec/`](spec/README.md) — canonical normative specification Markdown.
-- [`schemas/`](schemas/README.md) — future JSON Schemas.
-- [`fixtures/`](fixtures/README.md) — future schema-validation fixtures.
-- [`examples/`](examples/README.md) — future illustrative integrations.
+- [`schemas/`](schemas/README.md) — machine-readable JSON Schemas.
+- [`fixtures/`](fixtures/README.md) — schema-validation fixtures.
+- [`examples/`](examples/README.md) — illustrative integrations.
 - [`website/`](website/) — Docusaurus source for the GitHub Pages site.
 
 ## Participate
