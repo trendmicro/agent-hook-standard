@@ -1,0 +1,16 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "69f5e215-4a7f-40f5-918e-d98462934074",
+  "hook_event_name": "PreMemoryWrite",
+  "session_id": "session-42",
+  "timestamp": "2026-09-09T10:15:19Z",
+  "sequence": 7,
+  "prompt_id": "prompt-17",
+  "memory_store_id": "vector-store-shared",
+  "memory_key": "user_preferences_cloud_env",
+  "content": {
+    "preferred_region": "us-east-1",
+    "deploy_stage": "staging"
+  },
+  "content_identity": "sha256:1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b"
+}

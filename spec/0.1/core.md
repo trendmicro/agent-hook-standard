@@ -56,6 +56,12 @@ omit either member rather than fabricate a value. `agent_id`, `agent_type`,
 `permission_mode`, `effort`, and `scratchpad_dir` MAY be included as flat
 host-provided context.
 
+Enterprise security contexts MAY include the following flat top-level members:
+- `actor`: An object identifying the principal initiator (`subject`, optional `assurance_level`, and optional `tenant_id`).
+- `delegation_chain`: An ordered array of agent identifiers or delegation records tracing execution lineage from root caller to current subagent.
+- `thought_process`: The agent's pre-execution reasoning or scratchpad text, utilized by security receivers for Indirect Prompt Injection (IPI) detection.
+- `content_identity`: A cryptographic fingerprint formatted as `sha256:<hex>`. The digest MUST be computed over the **RFC 8785 (JSON Canonicalization Scheme - JCS)** canonical bytes representation of the target payload (e.g. `tool_input` for `PreToolUse`, `content` for `PreMemoryWrite`).
+
 The event registry identifies turn-scoped events. A turn-scoped event MUST
 contain `prompt_id`, an opaque identifier shared by all events causally
 attributable to the same caller-initiated turn. Session lifecycle events that
@@ -85,6 +91,18 @@ An event MAY contain `extensions`, as defined in the
 [extension policy](./extensions.md). Hosts MUST preserve the correlation
 members above when an event passes through an adapter or intermediate
 component.
+
+### Transport security and wire headers
+
+For remote microservice (HTTP/2, gRPC) or inter-process (Unix Domain Socket) transports requiring wire-level authentication and non-repudiation, the sender and receiver SHOULD attach the following wire headers:
+
+| Header Name | Type | Description |
+| --- | --- | --- |
+| `Hook-Id` | String (UUIDv7) | Monotonically time-ordered message identifier for anti-replay cache tracking. |
+| `Hook-Timestamp` | String (RFC 3339 UTC) | Request dispatch timestamp; receivers MUST enforce a clock drift window (default 300s). |
+| `Hook-Attempt` | Integer | Retry counter (1-indexed); signature input binding prevents on-path replay mutation. |
+| `Hook-Signature` | String | Sender asymmetric signature formatted as `v1,ed25519=<hex>`, computed over `"{Hook-Id}.{Hook-Timestamp}.{Hook-Attempt}.{RFC8785Body}"`. |
+| `Hook-Response-Signature` | String | Receiver asymmetric response signature establishing bidirectional trust. |
 
 ### Data minimization and redaction
 
@@ -117,14 +135,19 @@ NOT be interpreted as a universal response decision.
 | --- | --- | --- |
 | `UserPromptSubmit` | Top-level `decision: "block"` with `reason`. | Prevents the accepted prompt from changing agent execution. |
 | `BeforeModelRequest` | `hookSpecificOutput.permissionDecision`, optional `permissionDecisionReason`, and optional `updatedMessages`. | The permission decision controls the pre-dispatch request; `updatedMessages` replaces the messages at that boundary. |
-| `PreToolUse` | `hookSpecificOutput.permissionDecision`, optional `permissionDecisionReason`, and optional `updatedInput`. | The permission decision controls the proposed tool use; `updatedInput` replaces the tool input at that boundary. |
+| `PreToolUse` | `hookSpecificOutput.permissionDecision`, optional `permissionDecisionReason`, optional `updatedInput`, optional `escalation`, and optional `approval_grant_token`. | The permission decision controls the proposed tool use; `updatedInput` replaces the tool input at that boundary; `escalation` triggers asynchronous HITL suspension. |
 | `PermissionRequest` | `hookSpecificOutput.decision.behavior`, with optional `updatedInput`, `updatedPermissions`, `message`, and `interrupt`. | The nested behavior controls the native approval request. |
+| `PreNetworkAccess` | `hookSpecificOutput.permissionDecision`, optional `permissionDecisionReason`. | The permission decision permits (`allow`) or blocks (`deny`) socket connection establishment. |
+| `PreMemoryWrite` | `hookSpecificOutput.permissionDecision`, optional `permissionDecisionReason`, optional `updatedContent`. | The permission decision permits (`allow`) or blocks (`deny`) long-term memory write. |
+| `ConfigChange` | `hookSpecificOutput.permissionDecision`, optional `permissionDecisionReason`. | The permission decision permits (`allow`) or reverts (`deny`) configuration mutation. |
+| `SessionRevoke` | Top-level `decision: "block"` or immediate session termination with `reason`. | Instantly aborts the agent turn, isolates runtime, and purges credentials. |
 
-For `BeforeModelRequest` and `PreToolUse`, `permissionDecision` is one of
-`allow`, `deny`, `ask`, or `defer`. For `PermissionRequest`, nested
-`decision.behavior` is `allow` or `deny`. An `allow` only passes that hook's
-native gate; it MUST NOT override sandbox, organization, managed-policy, or
-user-approval restrictions.
+For `BeforeModelRequest`, `PreToolUse`, `PreNetworkAccess`, and `PreMemoryWrite`,
+`permissionDecision` is one of `allow`, `deny`, `ask`, or `defer`.
+When `permissionDecision: "ask"` is returned, the handler MUST include an
+`escalation` descriptor conforming to the [Asynchronous HITL Specification](./hitl.md).
+An `allow` only passes that hook's native gate; it MUST NOT override sandbox,
+organization, managed-policy, or user-approval restrictions.
 
 Agent Hook control semantics are portable; native response documents are not.
 An adapter MUST interpret a control response only for a Core event classified as

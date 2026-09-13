@@ -27,8 +27,12 @@ JSON Schemas, fixtures, and examples make the JSON interchange testable.
 - [Core protocol](./core.md) defines the flat envelope, security correlation,
   Claude-shaped event-specific control responses, capability declarations,
   fail-open behavior, versioning, and conformance requirements.
-- [Event registry](./events.md) defines the 13 Core PascalCase event names,
-  their timing, required flat fields, and intended capability boundaries.
+- [Event registry](./events.md) defines the Core PascalCase event names,
+  their timing, required flat fields, Twelve Defense Gates, and intended capability boundaries.
+- [Human-in-the-Loop Protocol](./hitl.md) defines asynchronous state suspension,
+  escalation cards, and turn resumption protocols.
+- [Audit Ledger](./audit-ledger.md) defines 4-Block tamper-evident audit records
+  and cryptographic hash-chaining (EU AI Act Art. 12).
 - [Extensions](./extensions.md) defines portable extension boundaries.
 - [Security considerations](./security.md) defines data-handling and policy
   requirements.

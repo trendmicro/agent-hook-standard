@@ -66,18 +66,24 @@ machine-readable schemas in [`../schemas/`](../schemas/). Agent Hook 0.1:
 2. Defines `spec` and `event_id` as the required members of a correlated
    response, retaining Claude-shaped, event-specific control members rather than
    a universal decision enum.
-3. Defines thirteen case-sensitive Core `hook_event_name` values:
+3. Defines case-sensitive Core `hook_event_name` values:
    `SessionStart`, `UserPromptSubmit`, `BeforeModelRequest`, `AfterModelResponse`,
    `PreToolUse`, `PermissionRequest`, `PermissionDenied`, `PostToolUse`,
-   `PostToolUseFailure`, `SubagentStart`, `SubagentStop`, `Stop`, and
-   `SessionEnd`.
-4. Defines `UserPromptSubmit`, `BeforeModelRequest`, `PreToolUse`, and
-   `PermissionRequest` as decision-capable pre-action events; all other Core
-   events are observational.
-5. Makes failed, timed-out, absent, and invalid hook responses fail open.
-6. Reserves extensions for vendor-specific names and data, with adapter
+   `PostToolUseFailure`, `PreNetworkAccess`, `PostNetworkAccess`, `SubagentStart`,
+   `SubagentStop`, `PreMemoryWrite`, `PostMemoryWrite`, `ConfigChange`, `SessionRevoke`,
+   `Stop`, and `SessionEnd`.
+4. Defines `UserPromptSubmit`, `BeforeModelRequest`, `PreToolUse`, `PermissionRequest`,
+   `PreNetworkAccess`, `PreMemoryWrite`, `ConfigChange`, `SessionRevoke`, and when
+   declared, `SessionStart` and `SubagentStart` as decision-capable pre-action gates;
+   other Core events are observational.
+5. Makes failed, timed-out, absent, and invalid hook responses fail open by default
+   in general developer contexts, while allowing explicit fail-closed policies under
+   the Enterprise Zero-Trust Profile ([RFC 0002](./0002-enterprise-security-defense-gates.md)).
+6. Standardizes Asynchronous Human-in-the-Loop (HITL) turn suspension and resumption via
+   companion [RFC 0003](./0003-agent-hitl-resumption-protocol.md).
+7. Reserves extensions for vendor-specific names and data, with adapter
    guidance rather than configuration-file compatibility claims.
-7. Requires a per-host capability declaration for every Core event, using
+8. Requires a per-host capability declaration for every Core event, using
    `gate`, `observe`, `partial`, or `unavailable`, so security telemetry
    consumers can interpret gaps without treating them as negative observations.
 

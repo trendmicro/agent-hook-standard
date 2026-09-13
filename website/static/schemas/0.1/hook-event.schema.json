@@ -42,8 +42,14 @@
         "PermissionDenied",
         "PostToolUse",
         "PostToolUseFailure",
+        "PreNetworkAccess",
+        "PostNetworkAccess",
         "SubagentStart",
         "SubagentStop",
+        "PreMemoryWrite",
+        "PostMemoryWrite",
+        "ConfigChange",
+        "SessionRevoke",
         "Stop",
         "SessionEnd"
       ]
@@ -82,8 +88,24 @@
         },
         "agent_id": { "type": "string", "minLength": 1 },
         "agent_type": { "type": "string", "minLength": 1 },
+        "actor": {
+          "type": "object",
+          "properties": {
+            "subject": { "type": "string", "minLength": 1 },
+            "assurance_level": { "type": "string" },
+            "tenant_id": { "type": "string" }
+          },
+          "required": ["subject"],
+          "additionalProperties": true
+        },
+        "delegation_chain": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "thought_process": { "type": "string" },
         "trace": { "$ref": "#/$defs/TraceContext" },
         "content_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "content_identity": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
         "extensions": { "$ref": "#/$defs/Extensions" }
       },
       "required": ["spec", "event_id", "hook_event_name", "session_id", "timestamp", "sequence"],
@@ -367,6 +389,101 @@
             "required": ["reason"]
           }
         ]
+      },
+      "PreNetworkAccess": {
+        "allOf": [
+          { "$ref": "#/$defs/CommonRequest" },
+          {
+            "type": "object",
+            "properties": {
+              "hook_event_name": { "const": "PreNetworkAccess" },
+              "destination_host": { "type": "string", "minLength": 1 },
+              "destination_port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+              "protocol": { "type": "string", "minLength": 1 },
+              "tls_fingerprint": { "type": "string" },
+              "source_pid": { "type": "integer" }
+            },
+            "required": ["prompt_id", "destination_host", "destination_port"]
+          }
+        ]
+      },
+      "PostNetworkAccess": {
+        "allOf": [
+          { "$ref": "#/$defs/CommonRequest" },
+          {
+            "type": "object",
+            "properties": {
+              "hook_event_name": { "const": "PostNetworkAccess" },
+              "destination_host": { "type": "string", "minLength": 1 },
+              "destination_port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+              "bytes_sent": { "type": "integer", "minimum": 0 },
+              "bytes_recv": { "type": "integer", "minimum": 0 },
+              "status_code": { "type": "integer" },
+              "duration_ms": { "type": "number", "minimum": 0 }
+            },
+            "required": ["prompt_id", "destination_host", "destination_port"]
+          }
+        ]
+      },
+      "PreMemoryWrite": {
+        "allOf": [
+          { "$ref": "#/$defs/CommonRequest" },
+          {
+            "type": "object",
+            "properties": {
+              "hook_event_name": { "const": "PreMemoryWrite" },
+              "memory_store_id": { "type": "string", "minLength": 1 },
+              "memory_key": { "type": "string", "minLength": 1 },
+              "content": {}
+            },
+            "required": ["prompt_id", "memory_store_id", "memory_key", "content"]
+          }
+        ]
+      },
+      "PostMemoryWrite": {
+        "allOf": [
+          { "$ref": "#/$defs/CommonRequest" },
+          {
+            "type": "object",
+            "properties": {
+              "hook_event_name": { "const": "PostMemoryWrite" },
+              "memory_store_id": { "type": "string", "minLength": 1 },
+              "memory_key": { "type": "string", "minLength": 1 },
+              "outcome": { "type": "string", "minLength": 1 }
+            },
+            "required": ["prompt_id", "memory_store_id", "memory_key", "outcome"]
+          }
+        ]
+      },
+      "ConfigChange": {
+        "allOf": [
+          { "$ref": "#/$defs/CommonRequest" },
+          {
+            "type": "object",
+            "properties": {
+              "hook_event_name": { "const": "ConfigChange" },
+              "config_file_path": { "type": "string", "minLength": 1 },
+              "mutation_type": { "enum": ["create", "update", "delete"] },
+              "old_value_hash": { "type": "string" },
+              "new_value_hash": { "type": "string", "minLength": 1 }
+            },
+            "required": ["config_file_path", "mutation_type", "new_value_hash"]
+          }
+        ]
+      },
+      "SessionRevoke": {
+        "allOf": [
+          { "$ref": "#/$defs/CommonRequest" },
+          {
+            "type": "object",
+            "properties": {
+              "hook_event_name": { "const": "SessionRevoke" },
+              "revoke_reason": { "type": "string", "minLength": 1 },
+              "revoked_by": { "type": "string", "minLength": 1 }
+            },
+            "required": ["revoke_reason", "revoked_by"]
+          }
+        ]
       }
     },
     "VendorRequest": {
@@ -392,8 +509,14 @@
         { "$ref": "#/$defs/requestsByEvent/PermissionDenied" },
         { "$ref": "#/$defs/requestsByEvent/PostToolUse" },
         { "$ref": "#/$defs/requestsByEvent/PostToolUseFailure" },
+        { "$ref": "#/$defs/requestsByEvent/PreNetworkAccess" },
+        { "$ref": "#/$defs/requestsByEvent/PostNetworkAccess" },
         { "$ref": "#/$defs/requestsByEvent/SubagentStart" },
         { "$ref": "#/$defs/requestsByEvent/SubagentStop" },
+        { "$ref": "#/$defs/requestsByEvent/PreMemoryWrite" },
+        { "$ref": "#/$defs/requestsByEvent/PostMemoryWrite" },
+        { "$ref": "#/$defs/requestsByEvent/ConfigChange" },
+        { "$ref": "#/$defs/requestsByEvent/SessionRevoke" },
         { "$ref": "#/$defs/requestsByEvent/Stop" },
         { "$ref": "#/$defs/requestsByEvent/SessionEnd" },
         { "$ref": "#/$defs/VendorRequest" }

@@ -1,0 +1,20 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "47d3c093-2e5d-4ed3-bf6c-b76240712852",
+  "hook_event_name": "PreNetworkAccess",
+  "session_id": "session-42",
+  "timestamp": "2026-09-09T10:15:17Z",
+  "sequence": 5,
+  "prompt_id": "prompt-17",
+  "destination_host": "api.github.com",
+  "destination_port": 443,
+  "protocol": "https",
+  "tls_fingerprint": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "source_pid": 12844,
+  "actor": {
+    "subject": "alice@enterprise.corp",
+    "assurance_level": "aal3",
+    "tenant_id": "corp-finance"
+  },
+  "content_identity": "sha256:3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7"
+}

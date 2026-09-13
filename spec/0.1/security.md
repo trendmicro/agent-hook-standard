@@ -20,13 +20,36 @@ that requests approval must use a host approval flow; non-interactive hosts MUST
 deny instead of assuming consent.
 
 Only the gate events defined by the event registry may interpret a control
-response:
-`UserPromptSubmit`, `BeforeModelRequest`, `PreToolUse`, and
-`PermissionRequest`. A host MUST ignore a control response for any other
-`hook_event_name` for control purposes. In particular, a control response
-returned for
-an event that reports a completed, failed, denied, or ended operation MUST NOT
-be represented as preventive enforcement.
+response: `UserPromptSubmit`, `BeforeModelRequest`, `PreToolUse`, `PermissionRequest`,
+`PreNetworkAccess`, `PreMemoryWrite`, `ConfigChange`, `SessionRevoke`, and when
+declared as a gate, `SessionStart` and `SubagentStart`. A host MUST ignore a
+control response for any other `hook_event_name` for control purposes. In
+particular, a control response returned for an event that reports a completed,
+failed, denied, or ended operation MUST NOT be represented as preventive enforcement.
+
+## The Five Enterprise Security Pillars
+
+Implementations conforming to enterprise security profiles SHOULD uphold the
+following foundational security pillars:
+
+1. **Zero-Trust Identity & Attestation**:
+   Every agent action and delegation chain MUST be attributed to a verifiable
+   initiator (`actor.subject`) and bound to runtime cryptographic keys.
+2. **Deterministic TOCTOU Defense**:
+   All operations evaluated by human or automated policy MUST be cryptographically
+   fingerprinted using RFC 8785 (JCS) SHA-256 digests (`content_identity`). Hosts
+   MUST re-verify this digest in-memory immediately prior to tool dispatch.
+3. **Wire Authentication & Non-Repudiation**:
+   Inter-service hook transport MUST enforce request and response signing via
+   Ed25519 digital signatures (`Hook-Signature`), coupled with UUIDv7 monotonic
+   ordering and replay protection windows.
+4. **Kernel-Enforced Perimeter & Network Gating**:
+   Agent runtimes MUST NOT rely solely on userland prompt guardrails. Outbound
+   network connections MUST be intercepted at `PreNetworkAccess` via OS-level
+   sandboxing, proxies, or eBPF to prevent SSRF and internal infrastructure probing.
+5. **Tamper-Evident Audit Ledgers (EU AI Act Article 12)**:
+   Audit logs MUST be formatted using 4-Block records chained via `prev_record_hash`
+   cryptographic digests, guaranteeing legal non-repudiation.
 
 ## Handler isolation and transport
 

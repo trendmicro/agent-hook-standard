@@ -1,0 +1,15 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "58e4d104-3f6e-4fe4-a07d-c87351823963",
+  "hook_event_name": "PostNetworkAccess",
+  "session_id": "session-42",
+  "timestamp": "2026-09-09T10:15:18Z",
+  "sequence": 6,
+  "prompt_id": "prompt-17",
+  "destination_host": "api.github.com",
+  "destination_port": 443,
+  "bytes_sent": 1024,
+  "bytes_recv": 4096,
+  "status_code": 200,
+  "duration_ms": 120.5
+}

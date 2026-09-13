@@ -1,0 +1,10 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "92c8b548-7da2-4328-84b1-0c17952673a7",
+  "hook_event_name": "SessionRevoke",
+  "session_id": "session-42",
+  "timestamp": "2026-09-09T10:15:22Z",
+  "sequence": 10,
+  "revoke_reason": "Suspected indirect prompt injection detected in tool output",
+  "revoked_by": "secops-incident-responder@enterprise.corp"
+}
