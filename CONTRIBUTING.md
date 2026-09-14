@@ -70,8 +70,8 @@ Do not report security-sensitive issues in a public GitHub issue. Follow
 
 ## Contact
 
-For questions, use the GitHub support channel or contact
-`alloftrendgithubenterpriseadmin@trendmicro.com`.
+For questions, use [GitHub Discussions](https://github.com/trendmicro/agent-hook-standard/discussions)
+or contact a [maintainer](GOVERNANCE.md#active-maintainers).
 
 Thank you for helping make this specification clearer, more reliable, and more
 useful.
