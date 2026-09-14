@@ -30,6 +30,13 @@ adapter MUST declare that Core event `unavailable` rather than fabricate it.
 | `Stop` | `Stop` | Preserve the active turn's `prompt_id` when the stop is turn-scoped. |
 | `SessionEnd` | `SessionEnd` | Preserve the native end reason. |
 
+This guide defines no Claude Code mapping for `PreNetworkAccess`,
+`PostNetworkAccess`, `PreMemoryWrite`, `PostMemoryWrite`, or `PreConfigChange`.
+An adapter MUST assess each event against its
+[registry requirements](./events.md) and declare its actual capability. A tool
+name, a file change, or a later side effect alone does not establish the
+required boundary. Network and memory Pre and Post support are independent.
+
 The exact native availability and payload vary by product and release. An
 adapter for another host MUST map only events it can implement faithfully and
 MUST publish its own `gate`, `observe`, `partial`, or `unavailable` capability
@@ -51,6 +58,13 @@ requires them. In particular, it MUST not attempt to correlate Claude Code's
 `PermissionRequest` with a later tool event solely from timing, because the
 native request has no `tool_use_id`.
 
+For network, memory, and configuration activities, adapters MUST preserve the
+[operation correlation rules](./events.md#correlation-and-ordering), including
+generation at the operation boundary when only a Post event is observable and
+reuse at native approval for the same operation. Redirect and retry requests
+are separate network operations; an SDK that hides their boundaries cannot
+support a faithful mapping merely because its first request is visible.
+
 An adapter MAY redact data before delivery to a handler. It MUST preserve the
 meaning and correlation of the exposed event, and MUST downgrade the capability
 to `partial` or `unavailable` when redaction prevents faithful security
@@ -70,11 +84,15 @@ boundary.
 | `BeforeModelRequest` | `hookSpecificOutput` with `hookEventName`, `permissionDecision`, optional `permissionDecisionReason`, and optional `updatedMessages`. | Claude Code has no native event; declare it `unavailable` rather than fabricate a mapping. |
 | `PreToolUse` | `hookSpecificOutput` with `hookEventName`, `permissionDecision`, optional `permissionDecisionReason`, and optional `updatedInput`. | Map to Claude Code's `PreToolUse` permission decision. |
 | `PermissionRequest` | `hookSpecificOutput.decision.behavior`, with optional input, permission, message, and interrupt updates. | Map to Claude Code's nested permission-request decision. |
+| `PreNetworkAccess`, `PreMemoryWrite`, `PreConfigChange` | `hookSpecificOutput` with `hookEventName`, `permissionDecision`, and optional `permissionDecisionReason`. | No mapping defined here; enforce only at an actual native boundary that meets the registry's Gate requirements. |
 
 `permissionDecision` uses `allow`, `deny`, `ask`, or `defer`; nested
 `decision.behavior` uses `allow` or `deny`. A response with
 `hookSpecificOutput` MUST use a `hookEventName` that matches the request. An
 adapter MUST NOT let an allow result override native or organization policy.
+The three added Gates MUST follow the
+[Core response rules](./core.md#response-envelope) for native approval,
+non-interactive `ask`, and `defer`; they define no input-rewriting control.
 
 Top-level `decision: "block"` and all `hookSpecificOutput` control members are
 ignored for an Observe event. Claude Code's other response shapes are likewise
@@ -88,6 +106,11 @@ Adapters MUST correlate the native invocation with `event_id` and MUST apply the
 core fail-open rule to absent, invalid, timed-out, or errored Agent Hook
 responses. A product's independently configured native behavior may be stricter
 but is not Agent Hook 0.1 behavior.
+
+Before delivering the five added events, adapters MUST satisfy the
+[revised-draft compatibility requirements](./core.md#versioning-and-conformance).
+Older 0.1 schemas reject these names; an unchanged `spec` value alone does not
+establish that a handler is configured to accept them.
 
 ## Non-normative stdio adapter pattern
 

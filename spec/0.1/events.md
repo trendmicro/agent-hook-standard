@@ -12,7 +12,8 @@ to be interpreted as described in the [Core protocol](./core.md).
 The registry adopts the flat request shape and `hook_event_name` spelling used
 by Claude Code hook requests. It standardizes portable lifecycle boundaries;
 it does not require a host to manufacture a callback that its native runtime
-does not expose.
+does not expose. Core is one standard vocabulary, not a requirement to
+implement every event. Support is declared separately for each event.
 
 ## Event name and request shape
 
@@ -48,6 +49,11 @@ an extension MAY expose related native data without claiming Core semantics.
 | `PermissionDenied` | After a user, policy, handler, or host denies a requested operation. | `prompt_id`, `permission_request_id`, `operation_id`, `reason`, `denied_by` | Observe |
 | `PostToolUse` | After one tool invocation completes successfully. | `prompt_id`, `tool_name`, `tool_input`, `tool_response`, `tool_use_id` | Observe |
 | `PostToolUseFailure` | After one tool invocation fails or is interrupted. | `prompt_id`, `tool_name`, `tool_input`, `tool_use_id`, `error` | Observe |
+| `PreNetworkAccess` | Immediately before one application-level outbound request is dispatched, before its request bytes are sent. | `operation_id`, `prompt_id`, `destination_host`, `destination_port`, `protocol` | Gate |
+| `PostNetworkAccess` | At the terminal result of one started application-level outbound request. | `operation_id`, `prompt_id`, `destination_host`, `destination_port`, `protocol`, `outcome`, and `error` on failure or interruption | Observe |
+| `PreMemoryWrite` | Immediately before one durable agent-memory create, update, or upsert becomes persistent or visible. | `operation_id`, `prompt_id`, `memory_store_id`, `memory_key`, `content` | Gate |
+| `PostMemoryWrite` | At the terminal result of one started durable agent-memory write. | `operation_id`, `prompt_id`, `memory_store_id`, `memory_key`, `outcome`, and `error` on failure or interruption | Observe |
+| `PreConfigChange` | Before a change to effective agent behavior or capability configuration takes effect. | `operation_id`, `config_target`, `mutation_type`, plus `new_value` for create/update and `prompt_id` when turn-attributable | Gate |
 | `SubagentStart` | Before a child agent receives executable work. | `prompt_id`, `delegation_id`, `agent_id`, `agent_type`, `parent_agent_id` | Observe |
 | `SubagentStop` | After a child agent reaches a terminal state. | `prompt_id`, `delegation_id`, `agent_id`, `agent_type`, `outcome` | Observe |
 | `Stop` | At the terminal boundary of a caller-initiated, prompt-scoped turn. | `prompt_id`, `outcome` | Observe |
@@ -130,6 +136,136 @@ host. A producer MAY include the Claude-compatible `is_interrupt` and
 `PostToolUse` and `PostToolUseFailure` are mutually exclusive terminal
 outcomes.
 
+### `PreNetworkAccess`
+
+A producer MUST emit `PreNetworkAccess` immediately before dispatching one
+application-level outbound request, such as an HTTP request, before sending
+its request bytes. A socket opening or closing, DNS lookup, pooled connection,
+or streaming chunk MUST NOT be represented as this boundary. Each redirect or
+retry request is a distinct operation with its own `operation_id` and MUST be
+gated separately when `gate` is claimed. Reusing a connection does not remove
+request boundaries. A host whose SDK hides redirects or retries MUST declare
+the affected capability `partial` unless it can faithfully observe and, for a
+Gate, enforce those boundaries.
+
+Both network events require `operation_id` and `prompt_id`; this draft covers
+requests attributable to a caller-initiated turn. They also require:
+
+- `destination_host`: a nonempty bare hostname or IP address, without a URL,
+  credentials, or other URL components.
+- `destination_port`: an integer from 1 through 65535.
+- `protocol`: a lowercase application protocol identifier matching
+  `^[a-z][a-z0-9+.-]*$`, such as `https`.
+
+These fields MUST describe the target of this individual request. Request
+payloads and headers are not required. This Gate controls application request
+dispatch; it does not establish a kernel network boundary or complete SSRF
+protection.
+
+### `PostNetworkAccess`
+
+A producer MUST emit exactly one `PostNetworkAccess` terminal result for each
+started request whose terminal result it observes, using the same
+`operation_id`, `prompt_id`, and request target as its `PreNetworkAccess`, when
+available. The target MUST remain the original target of this request, not the
+final target reached by a separate redirect request. A streaming request
+becomes terminal when its response body completes, fails, or is interrupted;
+individual chunks MUST NOT be emitted as terminal events.
+
+`outcome` and `error` MUST follow the [terminal-result rules](#network-and-memory-terminal-results).
+For this event, `success` means the request and response completed at the
+application protocol boundary, not that the application accepted the request.
+For example, a complete HTTP error-status response is a `success` outcome.
+
+`status_code` MAY contain an integer response status in the namespace of the
+declared `protocol`. It MUST describe this request's response, not a later
+redirect or retry. It MUST be omitted when no response status is available or
+the protocol has no integer response status; hosts MUST NOT substitute local
+transport errors or a synthetic zero. For protocols with interim responses,
+only the final response status MAY be reported; if no final status was
+observed, the field MUST be omitted.
+
+For HTTP(S), use the HTTP response status code defined by
+[RFC 9110, Section 15](https://www.rfc-editor.org/rfc/rfc9110.html#section-15).
+For example, a complete HTTP 403 response has `outcome: "success"` and MAY
+carry `status_code: 403`. A known final status MAY also be retained if the
+response body subsequently fails or is interrupted; it does not change the
+existing `outcome` or `error` requirements.
+
+`bytes_sent` and `bytes_recv` MAY contain non-negative integer counts of the
+serialized application request and response body bytes observed for this
+request, respectively, as transmitted and before content decoding. A body
+transmitted compressed is counted in its compressed representation. The counts
+MUST exclude headers, protocol framing, and transport overhead. They MUST be
+omitted when the runtime exposes only decoded, estimated, or connection-level
+values, or cannot otherwise accurately attribute the bytes to this request.
+Zero means an observed count of zero, not an unavailable measurement.
+
+### `PreMemoryWrite`
+
+A producer MUST emit `PreMemoryWrite` immediately before one create, update,
+or upsert of durable agent memory becomes persistent or visible. Durable agent
+memory means long-term agent context, including local file or database stores;
+it does not require a vector database. Arbitrary filesystem writes and volatile
+scratchpad changes MUST NOT be represented as this event.
+
+Both memory events require `operation_id`, `prompt_id`, `memory_store_id`, and
+`memory_key`. This draft covers writes attributable to a caller-initiated
+turn. `memory_store_id` and `memory_key` MUST be nonempty opaque strings whose
+combination identifies the logical write target. `PreMemoryWrite` additionally
+requires `content`, the proposed value as any JSON value, including `null`.
+
+### `PostMemoryWrite`
+
+A producer MUST emit exactly one `PostMemoryWrite` terminal result for each
+started write whose terminal result it observes. It MUST retain the
+`operation_id`, `prompt_id`, `memory_store_id`, and `memory_key` from
+`PreMemoryWrite`, when available.
+`outcome` and `error` MUST follow the [terminal-result rules](#network-and-memory-terminal-results).
+The event does not require an echo of the written content. Failure or
+interruption MUST NOT be interpreted as proof of rollback or absence of
+partial effects.
+
+### `PreConfigChange`
+
+A producer MUST emit `PreConfigChange` before a change to effective agent
+behavior or capability configuration takes effect, including model, tool, MCP,
+or rule settings. Arbitrary file changes and configuration for other
+applications MUST NOT be represented as this event. A host claiming `gate`
+MUST gate the actual configuration mutation; a denial prevents the pending
+change and MUST NOT mean rollback after it takes effect.
+
+`operation_id`, `config_target`, and `mutation_type` are required.
+`config_target` MUST be a nonempty opaque identifier for one logical setting
+or an entire configuration document. `mutation_type` MUST be `create`,
+`update`, or `delete`. For `create` and `update`, `new_value` is REQUIRED and
+MUST be the complete proposed JSON value at that target, including `null` when
+that is the intended value; it MUST NOT be an unspecified patch. For `delete`,
+`new_value` MUST be omitted. Deleting a target is distinct from assigning it
+the JSON value `null`.
+
+`config_file_path` MAY be included as a nonempty string for a file-backed
+target. `old_value` MAY contain any JSON value when known and safe to disclose;
+its absence does not assert that the target was absent. `prompt_id` is REQUIRED
+when the change is attributable to a caller-initiated turn and MUST otherwise
+be omitted. No cryptographic hash is required or defined by this event.
+
+### Network and memory terminal results
+
+For `PostNetworkAccess` and `PostMemoryWrite`, `outcome` MUST be `success`,
+`failure`, or `interrupted`. A `failure` or `interrupted` outcome MUST include
+the existing `error` object with a nonempty string `type` and an optional
+string `message`. A `success` outcome MUST NOT include `error`. `duration_ms`
+MAY contain a non-negative number when the duration is accurately known.
+Hosts MUST ignore all response control fields for these Observe events.
+
+A pre-operation denial MUST NOT produce either Post event as evidence of
+execution. Native permission telemetry MAY report that denial when the
+required identifiers and semantics of `PermissionRequest` and
+`PermissionDenied` are available. A failed or interrupted operation may have
+already sent bytes or made a partial memory change; its terminal outcome alone
+does not prove that it had no effects.
+
 ### `SubagentStart`
 
 A producer MUST emit `SubagentStart` before the identified child agent receives
@@ -171,6 +307,16 @@ An **Observe** event records a lifecycle boundary without making the event a
 portable control point. A host MUST NOT use a handler response to retroactively
 change an observed action while claiming conformance to this registry.
 
+`PreNetworkAccess`, `PreMemoryWrite`, and `PreConfigChange` use the
+[Core permission-decision response](./core.md#response-envelope). For a host
+declaring `gate`, a decision applies only to the operation, target, and proposed
+values presented to the handler. If those change before dispatch or mutation,
+the host MUST evaluate the Gate again against the changed operation before
+proceeding. A host that cannot enforce this precondition MUST NOT claim `gate`.
+These events define no
+content-rewriting response: `updatedInput`, `updatedMessages`, and other
+undefined control members MUST have no control effect for these three Gates.
+
 ## Correlation and ordering
 
 `event_id` identifies a single delivery to a single handler. It MUST NOT be
@@ -182,6 +328,9 @@ used in place of an action or lifecycle correlation identifier.
   `PostToolUse` or `PostToolUseFailure` when a terminal result is observed.
 - `permission_request_id` and `operation_id` correlate `PermissionRequest`
   with `PermissionDenied`.
+- `operation_id` correlates `PreNetworkAccess` with `PostNetworkAccess`, and
+  `PreMemoryWrite` with `PostMemoryWrite`, and identifies a `PreConfigChange`
+  mutation.
 - `delegation_id` correlates `SubagentStart` with `SubagentStop`.
 - `prompt_id` correlates `UserPromptSubmit` with `Stop`.
 
@@ -191,11 +340,22 @@ when timestamps collide or are imprecise. An adapter or intermediate component
 MUST preserve correlation identifiers and MUST NOT reuse them for a different
 logical action.
 
+For the network, memory, and configuration events, `operation_id` MUST be a
+nonempty opaque string identifying one underlying operation, unique within
+the session across these activities. The host MUST generate it at the
+underlying operation boundary even when a pre-event cannot be observed. It
+MUST remain stable across paired pre/post events and redelivery. If the exact
+same operation reaches `PermissionRequest` or `PermissionDenied`, those events
+MUST retain this `operation_id`; a different underlying operation MUST NOT
+reuse it. A consumer MUST NOT substitute a destination, memory key,
+configuration target, or delivery `event_id` for operation correlation.
+
 ## Sensitive content and telemetry
 
 Prompts, model messages, tool input, tool responses, errors, workspace paths,
-and transcript locations can contain sensitive information. A producer MUST
-apply its applicable data-handling policy before delivering these fields to a
+transcript locations, network destinations, memory content, and configuration
+values can contain sensitive information. A producer MUST apply its applicable
+data-handling policy before delivering these fields to a
 handler or telemetry destination.
 
 When a producer omits, truncates, tokenizes, or replaces sensitive content, it
@@ -221,15 +381,18 @@ A host MAY support only the Core events it can implement faithfully. It MUST
 not label an after-the-fact notification as a pre-action Gate, and it MUST not
 claim that an omitted callback is equivalent to a Core event.
 
+Network and memory pre/post capabilities are independent. A host MAY declare
+the Post event `observe` even when its Pre event is `partial` or `unavailable`,
+provided the Post event meets its own boundary, data, and correlation
+requirements. It MUST generate `operation_id` for the actual operation and
+MUST NOT fabricate a Pre event. Supporting a Pre event likewise does not imply
+that the corresponding terminal result is observable.
+
 ## Deferred and extended events
 
-The following are not Core in Agent Hook 0.1: network access, file changes,
-worktree lifecycle, compaction, UI and message-display activity, reasoning,
-and task-management events. They MAY be specified as extensions under the
+Events for arbitrary file changes, worktree lifecycle, compaction, UI and
+message-display activity, reasoning, and task management remain outside Core
+in Agent Hook 0.1. `SessionRevoke` and `PostConfigChange` are also deferred.
+They MAY be specified as extensions under the
 [extension policy](./extensions.md), but an extension MUST NOT claim Core
 semantics unless a future version adds it to this registry.
-
-`NetworkAccessRequest` remains deferred pending a dedicated network-gateway
-profile. Current runtimes differ between a genuine preflight gate, a tool
-approval, and an after-the-fact notification; therefore it MUST NOT be treated
-as a portable Core Gate in 0.1.

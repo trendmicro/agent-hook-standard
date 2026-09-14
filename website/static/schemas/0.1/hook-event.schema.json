@@ -42,6 +42,11 @@
         "PermissionDenied",
         "PostToolUse",
         "PostToolUseFailure",
+        "PreNetworkAccess",
+        "PostNetworkAccess",
+        "PreMemoryWrite",
+        "PostMemoryWrite",
+        "PreConfigChange",
         "SubagentStart",
         "SubagentStop",
         "Stop",
@@ -113,6 +118,28 @@
       },
       "required": ["type"],
       "additionalProperties": true
+    },
+    "DestinationHost": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "Bare hostname/IPv4 or unbracketed IPv6 shape, never an authority with a port. Hosts validate complete address syntax; compressed IPv6 expanded-group counts and IPv4 decimal ranges are not checked here.",
+      "anyOf": [
+        { "pattern": "^[^\\s/@?#:\\[\\]]+$" },
+        {
+          "pattern": "^(?:[0-9A-Fa-f]{0,4}:){2,8}(?:[0-9A-Fa-f]{0,4}|[0-9]{1,3}(?:\\.[0-9]{1,3}){3})$",
+          "not": {
+            "anyOf": [
+              { "pattern": ":::" },
+              { "pattern": "::.*::" }
+            ]
+          },
+          "anyOf": [
+            { "pattern": "::" },
+            { "pattern": "^(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}$" },
+            { "pattern": "^(?:[0-9A-Fa-f]{1,4}:){6}[0-9]{1,3}(?:\\.[0-9]{1,3}){3}$" }
+          ]
+        }
+      ]
     },
     "Operation": {
       "type": "object",
@@ -308,6 +335,138 @@
           }
         ]
       },
+      "PreNetworkAccess": {
+        "allOf": [
+          { "$ref": "#/$defs/CommonRequest" },
+          {
+            "type": "object",
+            "properties": {
+              "hook_event_name": { "const": "PreNetworkAccess" },
+              "operation_id": { "type": "string", "minLength": 1 },
+              "destination_host": { "$ref": "#/$defs/DestinationHost" },
+              "destination_port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+              "protocol": { "type": "string", "pattern": "^[a-z][a-z0-9+.-]*$" }
+            },
+            "required": ["operation_id", "prompt_id", "destination_host", "destination_port", "protocol"]
+          }
+        ]
+      },
+      "PostNetworkAccess": {
+        "allOf": [
+          { "$ref": "#/$defs/CommonRequest" },
+          {
+            "type": "object",
+            "properties": {
+              "hook_event_name": { "const": "PostNetworkAccess" },
+              "operation_id": { "type": "string", "minLength": 1 },
+              "destination_host": { "$ref": "#/$defs/DestinationHost" },
+              "destination_port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+              "protocol": { "type": "string", "pattern": "^[a-z][a-z0-9+.-]*$" },
+              "outcome": { "enum": ["success", "failure", "interrupted"] },
+              "error": { "$ref": "#/$defs/Error" },
+              "status_code": { "type": "integer" },
+              "bytes_sent": { "type": "integer", "minimum": 0 },
+              "bytes_recv": { "type": "integer", "minimum": 0 },
+              "duration_ms": { "type": "number", "minimum": 0 }
+            },
+            "required": ["operation_id", "prompt_id", "destination_host", "destination_port", "protocol", "outcome"],
+            "allOf": [
+              {
+                "if": {
+                  "properties": { "outcome": { "const": "success" } },
+                  "required": ["outcome"]
+                },
+                "then": {
+                  "not": { "required": ["error"] }
+                },
+                "else": {
+                  "required": ["error"]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "PreMemoryWrite": {
+        "allOf": [
+          { "$ref": "#/$defs/CommonRequest" },
+          {
+            "type": "object",
+            "properties": {
+              "hook_event_name": { "const": "PreMemoryWrite" },
+              "operation_id": { "type": "string", "minLength": 1 },
+              "memory_store_id": { "type": "string", "minLength": 1 },
+              "memory_key": { "type": "string", "minLength": 1 },
+              "content": {}
+            },
+            "required": ["operation_id", "prompt_id", "memory_store_id", "memory_key", "content"]
+          }
+        ]
+      },
+      "PostMemoryWrite": {
+        "allOf": [
+          { "$ref": "#/$defs/CommonRequest" },
+          {
+            "type": "object",
+            "properties": {
+              "hook_event_name": { "const": "PostMemoryWrite" },
+              "operation_id": { "type": "string", "minLength": 1 },
+              "memory_store_id": { "type": "string", "minLength": 1 },
+              "memory_key": { "type": "string", "minLength": 1 },
+              "outcome": { "enum": ["success", "failure", "interrupted"] },
+              "error": { "$ref": "#/$defs/Error" },
+              "duration_ms": { "type": "number", "minimum": 0 }
+            },
+            "required": ["operation_id", "prompt_id", "memory_store_id", "memory_key", "outcome"],
+            "allOf": [
+              {
+                "if": {
+                  "properties": { "outcome": { "const": "success" } },
+                  "required": ["outcome"]
+                },
+                "then": {
+                  "not": { "required": ["error"] }
+                },
+                "else": {
+                  "required": ["error"]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "PreConfigChange": {
+        "allOf": [
+          { "$ref": "#/$defs/CommonRequest" },
+          {
+            "type": "object",
+            "properties": {
+              "hook_event_name": { "const": "PreConfigChange" },
+              "operation_id": { "type": "string", "minLength": 1 },
+              "config_target": { "type": "string", "minLength": 1 },
+              "mutation_type": { "enum": ["create", "update", "delete"] },
+              "config_file_path": { "type": "string", "minLength": 1 },
+              "old_value": {},
+              "new_value": {}
+            },
+            "required": ["operation_id", "config_target", "mutation_type"],
+            "allOf": [
+              {
+                "if": {
+                  "properties": { "mutation_type": { "const": "delete" } },
+                  "required": ["mutation_type"]
+                },
+                "then": {
+                  "not": { "required": ["new_value"] }
+                },
+                "else": {
+                  "required": ["new_value"]
+                }
+              }
+            ]
+          }
+        ]
+      },
       "SubagentStart": {
         "allOf": [
           { "$ref": "#/$defs/CommonRequest" },
@@ -392,6 +551,11 @@
         { "$ref": "#/$defs/requestsByEvent/PermissionDenied" },
         { "$ref": "#/$defs/requestsByEvent/PostToolUse" },
         { "$ref": "#/$defs/requestsByEvent/PostToolUseFailure" },
+        { "$ref": "#/$defs/requestsByEvent/PreNetworkAccess" },
+        { "$ref": "#/$defs/requestsByEvent/PostNetworkAccess" },
+        { "$ref": "#/$defs/requestsByEvent/PreMemoryWrite" },
+        { "$ref": "#/$defs/requestsByEvent/PostMemoryWrite" },
+        { "$ref": "#/$defs/requestsByEvent/PreConfigChange" },
         { "$ref": "#/$defs/requestsByEvent/SubagentStart" },
         { "$ref": "#/$defs/requestsByEvent/SubagentStop" },
         { "$ref": "#/$defs/requestsByEvent/Stop" },
