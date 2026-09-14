@@ -1,0 +1,9 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "36006c70-281a-5e27-b302-f30619897899",
+  "hookSpecificOutput": {
+    "hookEventName": "PreConfigChange",
+    "permissionDecision": "ask",
+    "permissionDecisionReason": "Confirm this operation using native approval."
+  }
+}

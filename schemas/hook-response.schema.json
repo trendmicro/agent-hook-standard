@@ -89,12 +89,11 @@
             "PostToolUseFailure",
             "PreNetworkAccess",
             "PostNetworkAccess",
-            "SubagentStart",
-            "SubagentStop",
             "PreMemoryWrite",
             "PostMemoryWrite",
-            "ConfigChange",
-            "SessionRevoke",
+            "PreConfigChange",
+            "SubagentStart",
+            "SubagentStop",
             "Stop",
             "SessionEnd"
           ]
@@ -156,28 +155,6 @@
         "updatedMessages": {
           "type": "array",
           "items": {}
-        },
-        "updatedContent": {},
-        "updatedPermissions": {
-          "type": "array",
-          "items": {}
-        },
-        "approval_grant_token": {
-          "type": "string"
-        },
-        "escalation": {
-          "type": "object",
-          "properties": {
-            "challenge_id": { "type": "string", "minLength": 1 },
-            "approval_url": { "type": "string" },
-            "timeout_seconds": { "type": "integer", "minimum": 1 },
-            "channels": {
-              "type": "array",
-              "items": { "type": "string" }
-            }
-          },
-          "required": ["challenge_id"],
-          "additionalProperties": true
         },
         "additionalContext": {
           "type": "string"

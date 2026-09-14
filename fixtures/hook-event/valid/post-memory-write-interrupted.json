@@ -1,0 +1,16 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "b9d121d1-411d-5bb4-adf9-7347d851404d",
+  "hook_event_name": "PostMemoryWrite",
+  "session_id": "session-42",
+  "timestamp": "2026-09-14T10:15:00Z",
+  "sequence": 11,
+  "prompt_id": "prompt-17",
+  "operation_id": "operation-memory-1",
+  "memory_store_id": "agent-notes",
+  "memory_key": "user/preferences",
+  "outcome": "interrupted",
+  "error": {
+    "type": "Cancelled"
+  }
+}

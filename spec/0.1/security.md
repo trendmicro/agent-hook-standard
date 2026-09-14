@@ -5,8 +5,9 @@ sidebar_position: 5
 # Security considerations
 
 Hook payloads can contain user prompts, filesystem paths, source code, tool
-arguments, tool outputs, model requests and responses, environment details, and
-credentials. Hosts, adapters, and handlers MUST treat all event data as
+arguments, tool outputs, model requests and responses, environment details,
+credentials, network destinations, durable memory content, and configuration
+values. Hosts, adapters, and handlers MUST treat all event data as
 untrusted input and SHOULD minimize the values they expose, persist, or
 transmit.
 
@@ -20,36 +21,24 @@ that requests approval must use a host approval flow; non-interactive hosts MUST
 deny instead of assuming consent.
 
 Only the gate events defined by the event registry may interpret a control
-response: `UserPromptSubmit`, `BeforeModelRequest`, `PreToolUse`, `PermissionRequest`,
-`PreNetworkAccess`, `PreMemoryWrite`, `ConfigChange`, `SessionRevoke`, and when
-declared as a gate, `SessionStart` and `SubagentStart`. A host MUST ignore a
-control response for any other `hook_event_name` for control purposes. In
-particular, a control response returned for an event that reports a completed,
-failed, denied, or ended operation MUST NOT be represented as preventive enforcement.
+response: `UserPromptSubmit`, `BeforeModelRequest`, `PreToolUse`,
+`PermissionRequest`, `PreNetworkAccess`, `PreMemoryWrite`, and
+`PreConfigChange`. A host MUST ignore a control response for any other
+`hook_event_name` for control purposes. In particular, a control response
+returned for
+an event that reports a completed, failed, denied, or ended operation MUST NOT
+be represented as preventive enforcement.
 
-## The Five Enterprise Security Pillars
-
-Implementations conforming to enterprise security profiles SHOULD uphold the
-following foundational security pillars:
-
-1. **Zero-Trust Identity & Attestation**:
-   Every agent action and delegation chain MUST be attributed to a verifiable
-   initiator (`actor.subject`) and bound to runtime cryptographic keys.
-2. **Deterministic TOCTOU Defense**:
-   All operations evaluated by human or automated policy MUST be cryptographically
-   fingerprinted using RFC 8785 (JCS) SHA-256 digests (`content_identity`). Hosts
-   MUST re-verify this digest in-memory immediately prior to tool dispatch.
-3. **Wire Authentication & Non-Repudiation**:
-   Inter-service hook transport MUST enforce request and response signing via
-   Ed25519 digital signatures (`Hook-Signature`), coupled with UUIDv7 monotonic
-   ordering and replay protection windows.
-4. **Kernel-Enforced Perimeter & Network Gating**:
-   Agent runtimes MUST NOT rely solely on userland prompt guardrails. Outbound
-   network connections MUST be intercepted at `PreNetworkAccess` via OS-level
-   sandboxing, proxies, or eBPF to prevent SSRF and internal infrastructure probing.
-5. **Tamper-Evident Audit Ledgers (EU AI Act Article 12)**:
-   Audit logs MUST be formatted using 4-Block records chained via `prev_record_hash`
-   cryptographic digests, guaranteeing legal non-repudiation.
+The network, memory, and configuration Gates MUST apply the
+[request-mutation preconditions](./events.md#gate-and-observe-semantics): a
+decision cannot authorize a target or proposed value that changed after the
+handler evaluated it. Their responses define no content rewriting.
+`PreNetworkAccess` covers application request dispatch, not kernel-level
+enforcement or complete SSRF protection. A failed or interrupted network
+request or memory write can have partial effects; the
+[terminal-result rules](./events.md#network-and-memory-terminal-results) do not
+promise rollback. A configuration denial must prevent the pending mutation,
+not attempt to undo an effective change.
 
 ## Handler isolation and transport
 
@@ -63,8 +52,9 @@ arguments, output, or persisted diagnostics.
 
 The Core event registry provides a minimum vocabulary for reconstructing an
 agent security-relevant lifecycle: session and turn boundaries, user ingress,
-model requests and responses, tool execution, permission outcomes, and
-subagent delegation. Telemetry consumers MUST retain the exact
+model requests and responses, tool execution, permission outcomes,
+subagent delegation, application network requests, durable memory writes,
+and effective configuration changes. Telemetry consumers MUST retain the exact
 `hook_event_name`; they MUST NOT replace it with a vendor-native event name.
 
 A host MAY expose only the Core events it can observe faithfully. A conforming
@@ -82,6 +72,11 @@ A host MUST NOT claim `gate` when it cannot prevent the pending operation, or
 claim `observe` when it only infers the event from a later side effect. A
 capability declaration describes the host's observable and enforceable surface;
 it does not override an independent security policy.
+
+Core membership does not require runtime support. Network and memory Pre and
+Post capabilities are independent; a faithful Post observation does not imply
+that the host could gate the operation. Hidden SDK redirects or retries require
+the capability limitations described in the [event registry](./events.md#prenetworkaccess).
 
 Security telemetry SHOULD preserve `session_id`, `model_request_id`,
 `tool_use_id`, `permission_request_id`, `operation_id`, and `delegation_id`

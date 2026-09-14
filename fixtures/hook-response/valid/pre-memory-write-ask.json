@@ -1,0 +1,9 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "c796687b-7acd-5b87-8701-7162382ec68d",
+  "hookSpecificOutput": {
+    "hookEventName": "PreMemoryWrite",
+    "permissionDecision": "ask",
+    "permissionDecisionReason": "Confirm this operation using native approval."
+  }
+}

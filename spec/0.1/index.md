@@ -27,18 +27,24 @@ JSON Schemas, fixtures, and examples make the JSON interchange testable.
 - [Core protocol](./core.md) defines the flat envelope, security correlation,
   Claude-shaped event-specific control responses, capability declarations,
   fail-open behavior, versioning, and conformance requirements.
-- [Event registry](./events.md) defines the Core PascalCase event names,
-  their timing, required flat fields, Twelve Defense Gates, and intended capability boundaries.
-- [Human-in-the-Loop Protocol](./hitl.md) defines asynchronous state suspension,
-  escalation cards, and turn resumption protocols.
-- [Audit Ledger](./audit-ledger.md) defines 4-Block tamper-evident audit records
-  and cryptographic hash-chaining (EU AI Act Art. 12).
+- [Event registry](./events.md) defines the 18 Core PascalCase event names,
+  their timing, required flat fields, and intended capability boundaries.
 - [Extensions](./extensions.md) defines portable extension boundaries.
 - [Security considerations](./security.md) defines data-handling and policy
   requirements.
 - [Adapter guide](./adapters.md) maps the Claude Code baseline and defines
   requirements for other native hook facilities.
 
-The draft is proposed by
+Network events describe application-level requests, including distinct retries
+and redirects; memory events describe durable agent context;
+`PreConfigChange` describes pending changes to agent behavior or capabilities.
+Each event is part of the standard vocabulary, but hosts may declare support
+independently. No enterprise service, signature, ledger, or remote approval
+workflow is required. Older 0.1 schemas reject the new names; adopters must
+update schemas and capability declarations before using the revised draft.
+
+The original draft is proposed by
 [RFC 0001](https://github.com/trendmicro/agent-hook-standard/blob/main/rfcs/0001-agent-hook-core-event-contract.md).
-It has not yet been accepted through the repository RFC process.
+The five-event expansion is proposed by
+[RFC 0004](https://github.com/trendmicro/agent-hook-standard/blob/main/rfcs/0004-standard-lifecycle-events.md).
+Neither proposal has yet been accepted through the repository RFC process.

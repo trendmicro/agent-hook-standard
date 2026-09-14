@@ -1,0 +1,13 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "c796687b-7acd-5b87-8701-7162382ec68d",
+  "hook_event_name": "PreMemoryWrite",
+  "session_id": "session-42",
+  "timestamp": "2026-09-14T10:15:00Z",
+  "sequence": 10,
+  "prompt_id": "prompt-17",
+  "operation_id": "operation-memory-1",
+  "memory_store_id": "agent-notes",
+  "memory_key": "user/preferences",
+  "content": null
+}
