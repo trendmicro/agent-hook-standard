@@ -71,15 +71,18 @@ cross-event correlation:
 | Identifier | Required event scope | Requirement |
 | --- | --- | --- |
 | `model_request_id` | `BeforeModelRequest`, `AfterModelResponse` | MUST identify one model request; the paired events MUST use the same value. |
-| `operation_id` | `PermissionRequest`, `PermissionDenied` | MUST identify the operation that reached an approval boundary; the paired events MUST use the same value. |
+| `operation_id` | `PermissionRequest`, `PermissionDenied`, `PreNetworkAccess`, `PostNetworkAccess`, `PreMemoryWrite`, `PostMemoryWrite`, `PreConfigChange` | MUST identify the underlying operation and remain stable across its related events, as defined by the [event registry](./events.md#correlation-and-ordering). |
 | `permission_request_id` | `PermissionRequest`, `PermissionDenied` | MUST identify one native approval request; a denial MUST retain the request's value. |
 | `delegation_id` | `SubagentStart`, `SubagentStop` | MUST identify one delegated subagent lifetime; the paired events MUST use the same value. |
 
 When a host supplies a native tool-call identifier, such as Claude Code's
 `tool_use_id`, an adapter SHOULD retain it as `tool_use_id`. At a permission
 boundary, an adapter MUST create `operation_id` and `permission_request_id`
-when the native runtime lacks them; it MUST NOT infer their correlation from
-timing alone.
+when the native runtime lacks them, retaining an existing `operation_id` for
+the same underlying operation. It MUST NOT infer their correlation from timing
+alone. Network, memory, and configuration operation identifiers MUST follow
+the registry's uniqueness, generation, and redelivery requirements, including
+when only a Post event can be observed.
 
 An event MAY contain `extensions`, as defined in the
 [extension policy](./extensions.md). Hosts MUST preserve the correlation
@@ -88,9 +91,10 @@ component.
 
 ### Data minimization and redaction
 
-Prompts, model messages, paths, tool arguments, tool results, and transcript
-locations can contain sensitive data. A host MAY redact or omit data that it
-cannot safely disclose. It MUST NOT fabricate a substitute value or silently
+Prompts, model messages, paths, tool arguments, tool results, transcript
+locations, network destinations, memory content, and configuration values can
+contain sensitive data. A host MAY redact or omit data that it cannot safely
+disclose. It MUST NOT fabricate a substitute value or silently
 change a security-relevant target such that a handler's decision appears to
 cover a different operation. If redaction prevents faithful observation,
 correlation, or enforcement at the declared boundary, the host MUST declare
@@ -119,12 +123,22 @@ NOT be interpreted as a universal response decision.
 | `BeforeModelRequest` | `hookSpecificOutput.permissionDecision`, optional `permissionDecisionReason`, and optional `updatedMessages`. | The permission decision controls the pre-dispatch request; `updatedMessages` replaces the messages at that boundary. |
 | `PreToolUse` | `hookSpecificOutput.permissionDecision`, optional `permissionDecisionReason`, and optional `updatedInput`. | The permission decision controls the proposed tool use; `updatedInput` replaces the tool input at that boundary. |
 | `PermissionRequest` | `hookSpecificOutput.decision.behavior`, with optional `updatedInput`, `updatedPermissions`, `message`, and `interrupt`. | The nested behavior controls the native approval request. |
+| `PreNetworkAccess`, `PreMemoryWrite`, `PreConfigChange` | `hookSpecificOutput.permissionDecision` and optional `permissionDecisionReason`. | The permission decision controls the pending request, write, or configuration mutation; these events define no content-rewriting controls. |
 
-For `BeforeModelRequest` and `PreToolUse`, `permissionDecision` is one of
+For `BeforeModelRequest`, `PreToolUse`, `PreNetworkAccess`, `PreMemoryWrite`,
+and `PreConfigChange`, `permissionDecision` is one of
 `allow`, `deny`, `ask`, or `defer`. For `PermissionRequest`, nested
 `decision.behavior` is `allow` or `deny`. An `allow` only passes that hook's
 native gate; it MUST NOT override sandbox, organization, managed-policy, or
 user-approval restrictions.
+
+For the three new Gates, `deny` MUST prevent the pending operation. `ask` MUST
+use the existing native approval flow; a non-interactive host MUST treat it as
+`deny`. `defer` leaves resolution to native approval or policy and MUST NOT
+count as approval. No asynchronous escalation or approval token is defined.
+The [event registry](./events.md#gate-and-observe-semantics) defines their
+request-mutation preconditions and which response members have no control
+effect.
 
 Agent Hook control semantics are portable; native response documents are not.
 An adapter MUST interpret a control response only for a Core event classified as
@@ -160,6 +174,18 @@ while claiming 0.1 default behavior.
 accept exactly `agent-hooks/0.1`; patch-only specification changes do not change
 the member. Future incompatible envelopes require a new major version.
 
+This revision extends an unaccepted 0.1 draft with `PreNetworkAccess`,
+`PostNetworkAccess`, `PreMemoryWrite`, `PostMemoryWrite`, and `PreConfigChange`
+while retaining `agent-hooks/0.1`. Earlier 0.1 schemas reject these names;
+the unchanged identifier does not imply compatibility with existing handlers.
+Adopters MUST update their schemas and capability declarations and ensure
+handler compatibility and configuration before enabling the new events.
+Hosts MUST deliver these events only to handlers configured for this revised
+draft. Automatic handler discovery or version negotiation is not defined, and
+an unknown event MUST NOT be treated as an implicit `allow` response.
+The [fail-open rule](#fail-open-behavior) still applies to response failures
+for configured event deliveries.
+
 A host claiming 0.1 conformance MUST publish a capability declaration that
 enumerates every Core `hook_event_name` in the event registry. For each name,
 the declaration MUST state exactly one of these modes:
@@ -175,6 +201,11 @@ A host MUST NOT fabricate a Core event to improve its declaration. It MUST NOT
 declare `gate` when the native timing is post-effect, a response cannot be
 enforced, redaction removes the security-relevant information needed for the
 declared boundary, or the event registry classifies the event as Observe.
+
+Core membership standardizes event names and semantics; it does not require a
+host to implement every event. Per-event obligations apply to the capabilities
+actually claimed, as specified by the [event registry](./events.md#core-event-registry).
+Network and memory Pre and Post support MUST be declared independently.
 
 An implementation conforms as an **event producer** if it emits schema-valid
 events, publishes an accurate capability declaration, and implements this

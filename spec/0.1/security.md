@@ -5,8 +5,9 @@ sidebar_position: 5
 # Security considerations
 
 Hook payloads can contain user prompts, filesystem paths, source code, tool
-arguments, tool outputs, model requests and responses, environment details, and
-credentials. Hosts, adapters, and handlers MUST treat all event data as
+arguments, tool outputs, model requests and responses, environment details,
+credentials, network destinations, durable memory content, and configuration
+values. Hosts, adapters, and handlers MUST treat all event data as
 untrusted input and SHOULD minimize the values they expose, persist, or
 transmit.
 
@@ -20,13 +21,24 @@ that requests approval must use a host approval flow; non-interactive hosts MUST
 deny instead of assuming consent.
 
 Only the gate events defined by the event registry may interpret a control
-response:
-`UserPromptSubmit`, `BeforeModelRequest`, `PreToolUse`, and
-`PermissionRequest`. A host MUST ignore a control response for any other
+response: `UserPromptSubmit`, `BeforeModelRequest`, `PreToolUse`,
+`PermissionRequest`, `PreNetworkAccess`, `PreMemoryWrite`, and
+`PreConfigChange`. A host MUST ignore a control response for any other
 `hook_event_name` for control purposes. In particular, a control response
 returned for
 an event that reports a completed, failed, denied, or ended operation MUST NOT
 be represented as preventive enforcement.
+
+The network, memory, and configuration Gates MUST apply the
+[request-mutation preconditions](./events.md#gate-and-observe-semantics): a
+decision cannot authorize a target or proposed value that changed after the
+handler evaluated it. Their responses define no content rewriting.
+`PreNetworkAccess` covers application request dispatch, not kernel-level
+enforcement or complete SSRF protection. A failed or interrupted network
+request or memory write can have partial effects; the
+[terminal-result rules](./events.md#network-and-memory-terminal-results) do not
+promise rollback. A configuration denial must prevent the pending mutation,
+not attempt to undo an effective change.
 
 ## Handler isolation and transport
 
@@ -40,8 +52,9 @@ arguments, output, or persisted diagnostics.
 
 The Core event registry provides a minimum vocabulary for reconstructing an
 agent security-relevant lifecycle: session and turn boundaries, user ingress,
-model requests and responses, tool execution, permission outcomes, and
-subagent delegation. Telemetry consumers MUST retain the exact
+model requests and responses, tool execution, permission outcomes,
+subagent delegation, application network requests, durable memory writes,
+and effective configuration changes. Telemetry consumers MUST retain the exact
 `hook_event_name`; they MUST NOT replace it with a vendor-native event name.
 
 A host MAY expose only the Core events it can observe faithfully. A conforming
@@ -59,6 +72,11 @@ A host MUST NOT claim `gate` when it cannot prevent the pending operation, or
 claim `observe` when it only infers the event from a later side effect. A
 capability declaration describes the host's observable and enforceable surface;
 it does not override an independent security policy.
+
+Core membership does not require runtime support. Network and memory Pre and
+Post capabilities are independent; a faithful Post observation does not imply
+that the host could gate the operation. Hidden SDK redirects or retries require
+the capability limitations described in the [event registry](./events.md#prenetworkaccess).
 
 Security telemetry SHOULD preserve `session_id`, `model_request_id`,
 `tool_use_id`, `permission_request_id`, `operation_id`, and `delegation_id`

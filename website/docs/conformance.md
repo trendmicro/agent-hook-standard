@@ -22,3 +22,15 @@ Schema validation proves document shape, not complete runtime behavior. An
 adapter review must additionally verify correct event mapping, `event_id`
 correlation, decision handling, and the required fail-open behavior for invalid,
 missing, timed-out, or errored handler responses.
+
+For the network and memory event pairs, verify that concurrent operations at
+the same destination or memory key retain distinct `operation_id` values, and
+that each terminal result retains its operation's identity. Network redirects
+and retries require separate request boundaries. `PreConfigChange` denial
+must prevent the change before it takes effect. An Observe callback cannot
+claim any of these preventive effects.
+
+The revised draft adds five event names. Existing 0.1 schemas do not recognize
+them; upgrade schemas and capability declarations and configure compatible
+handlers before delivery. Native `ask` still uses the host's approval flow;
+no asynchronous approval profile is required.
