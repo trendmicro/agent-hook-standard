@@ -1,0 +1,14 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "e8981ea4-2680-57d5-8ed8-708614ba4b09",
+  "hook_event_name": "PostMemoryWrite",
+  "session_id": "session-42",
+  "timestamp": "2026-09-14T10:15:00Z",
+  "sequence": 11,
+  "prompt_id": "prompt-17",
+  "operation_id": "operation-memory-1",
+  "memory_store_id": "agent-notes",
+  "memory_key": "user/preferences",
+  "outcome": "success",
+  "duration_ms": 0
+}

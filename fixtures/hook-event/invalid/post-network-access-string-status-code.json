@@ -1,0 +1,16 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "c7dbba16-5d81-4d1f-a4e3-09047f34420b",
+  "hook_event_name": "PostNetworkAccess",
+  "session_id": "session-42",
+  "timestamp": "2026-09-14T10:15:00Z",
+  "sequence": 11,
+  "prompt_id": "prompt-17",
+  "operation_id": "operation-network-1",
+  "destination_host": "api.example.com",
+  "destination_port": 443,
+  "protocol": "https",
+  "outcome": "success",
+  "duration_ms": 12.5,
+  "status_code": "403"
+}

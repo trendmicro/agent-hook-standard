@@ -1,0 +1,12 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "b35cf6e6-1659-5d5f-ab7e-17e6b7e1df56",
+  "hook_event_name": "PreConfigChange",
+  "session_id": "session-42",
+  "timestamp": "2026-09-14T10:15:00Z",
+  "sequence": 10,
+  "operation_id": "operation-config-1",
+  "config_target": "agent/model",
+  "mutation_type": "create",
+  "new_value": "example-model"
+}

@@ -1,0 +1,17 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "55b3bf68-5701-5e1c-bd3a-753d7e86353c",
+  "hook_event_name": "PostMemoryWrite",
+  "session_id": "session-42",
+  "timestamp": "2026-09-14T10:15:00Z",
+  "sequence": 11,
+  "prompt_id": "prompt-17",
+  "operation_id": "operation-memory-1",
+  "memory_store_id": "agent-notes",
+  "memory_key": "user/preferences",
+  "outcome": "failure",
+  "error": {
+    "type": "StoreUnavailable",
+    "message": "Memory store did not acknowledge the write."
+  }
+}

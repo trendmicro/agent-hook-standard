@@ -1,0 +1,17 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "76f447b0-90ca-5b6e-acd3-fadd24d697a2",
+  "hook_event_name": "PostNetworkAccess",
+  "session_id": "session-42",
+  "timestamp": "2026-09-14T10:15:00Z",
+  "sequence": 11,
+  "prompt_id": "prompt-17",
+  "operation_id": "operation-network-1",
+  "destination_host": "2001:db8::1",
+  "destination_port": 443,
+  "protocol": "https",
+  "outcome": "interrupted",
+  "error": {
+    "type": "Cancelled"
+  }
+}

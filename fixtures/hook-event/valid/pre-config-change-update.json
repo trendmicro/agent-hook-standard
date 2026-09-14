@@ -1,0 +1,20 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "36006c70-281a-5e27-b302-f30619897899",
+  "hook_event_name": "PreConfigChange",
+  "session_id": "session-42",
+  "timestamp": "2026-09-14T10:15:00Z",
+  "sequence": 10,
+  "operation_id": "operation-config-1",
+  "config_target": "agent/tools",
+  "prompt_id": "prompt-17",
+  "config_file_path": "/workspace/project/agent.json",
+  "mutation_type": "update",
+  "old_value": [
+    "Read"
+  ],
+  "new_value": [
+    "Read",
+    "Write"
+  ]
+}

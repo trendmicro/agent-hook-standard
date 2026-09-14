@@ -1,0 +1,13 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "7b42b9ef-a080-53f1-948a-72305405be7e",
+  "hook_event_name": "PreNetworkAccess",
+  "session_id": "session-42",
+  "timestamp": "2026-09-14T10:15:00Z",
+  "sequence": 10,
+  "prompt_id": "prompt-17",
+  "operation_id": "operation-network-1",
+  "destination_host": "[2001:db8::1]",
+  "destination_port": 443,
+  "protocol": "https"
+}
