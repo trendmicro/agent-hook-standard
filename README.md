@@ -35,11 +35,26 @@ to help shape it.
 
 ## Local setup
 
-Install the validator and website dependencies separately:
+Use Node.js 20 or later; CI validates and builds with Node.js 24.
+From the repository root, install the validator and website dependencies
+separately:
 
 ```sh
 npm ci
 npm ci --prefix website
+```
+
+Validate the schemas and fixtures, then build the website:
+
+```sh
+npm run validate
+npm run build
+```
+
+To preview the website locally, run:
+
+```sh
+npm start
 ```
 
 ## Participate

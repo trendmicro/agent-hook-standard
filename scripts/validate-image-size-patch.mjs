@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 
-import { imageSize } from '../vendor/image-size/dist/index.mjs';
-import { HEIF } from '../vendor/image-size/dist/types/heif.mjs';
-import { JXL } from '../vendor/image-size/dist/types/jxl.mjs';
+import { imageSize } from '../third_party/image-size/dist/index.mjs';
+import { HEIF } from '../third_party/image-size/dist/types/heif.mjs';
+import { JXL } from '../third_party/image-size/dist/types/jxl.mjs';
 
 const icns = Buffer.alloc(16);
 icns.write('icns', 0, 'ascii');
