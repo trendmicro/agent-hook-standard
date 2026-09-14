@@ -29,12 +29,22 @@ The RFC status is one of `Discussion`, `Draft`, `Accepted`, `Rejected`,
 `Withdrawn`, or `Superseded`. The final RFC records the review dates, each
 maintainer vote, the decision, and any RFC it supersedes or is superseded by.
 
+## Project owner
+
+The project owner is Kevin K Chang
+([kevin_k_chang@trendmicro.com](mailto:kevin_k_chang@trendmicro.com)).
+
 ## Active maintainers
 
 An active maintainer is a person with repository-maintainer access who has
 participated in governance or repository maintenance during the preceding six
-months. The current maintainers maintain this list through repository access
-and public decision records.
+months. The current maintainers keep the following list up to date alongside
+repository access and public decision records.
+
+| Maintainer | Contact |
+| --- | --- |
+| Kyle Huang | [kyle_huang@trendmicro.com](mailto:kyle_huang@trendmicro.com) |
+| Brian Chuang | [brian_chuang@trendmicro.com](mailto:brian_chuang@trendmicro.com) |
 
 ## Changes to this policy
 
