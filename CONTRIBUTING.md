@@ -39,10 +39,12 @@ to its prior GitHub Discussion.
 2. Create a descriptive branch for one feature, fix, or documentation update.
 3. Make the change. Keep JSON examples valid and update related schema,
    documentation, and comparison files when needed.
-4. Install dependencies and run the validation suite:
+4. Use Node.js 20 or later (CI uses Node.js 24). From the repository root,
+   install dependencies and run validation and the website build:
 
    ```sh
    npm ci
+   npm ci --prefix website
    npm run validate
    npm run build
    ```
@@ -63,9 +65,8 @@ to its prior GitHub Discussion.
 
 ## Security concerns
 
-Do not report security-sensitive issues in a public GitHub issue. Follow this
-repository's security policy when one is available, or contact a maintainer
-privately.
+Do not report security-sensitive issues in a public GitHub issue. Follow
+[SECURITY.md](SECURITY.md) to report them privately.
 
 ## Contact
 
