@@ -364,6 +364,7 @@
               "protocol": { "type": "string", "pattern": "^[a-z][a-z0-9+.-]*$" },
               "outcome": { "enum": ["success", "failure", "interrupted"] },
               "error": { "$ref": "#/$defs/Error" },
+              "status_code": { "type": "integer" },
               "bytes_sent": { "type": "integer", "minimum": 0 },
               "bytes_recv": { "type": "integer", "minimum": 0 },
               "duration_ms": { "type": "number", "minimum": 0 }
