@@ -132,6 +132,21 @@ representation. Decoded-only, estimated, or unassignable counts MUST be omitted;
 zero means an observed zero. No kernel interception or complete SSRF
 protection is implied by these fields or event names.
 
+Post MAY include `status_code`, an integer response status in the namespace
+of the declared `protocol`. It MUST describe this request's response, not a
+later redirect or retry. It MUST be omitted when no response status is
+available or the protocol has no integer response status; hosts MUST NOT
+substitute local transport errors or a synthetic zero. For protocols with
+interim responses, only the final response status MAY be reported; if no
+final status was observed, the field MUST be omitted.
+
+For HTTP(S), the value is the HTTP response status code defined by
+[RFC 9110, Section 15](https://www.rfc-editor.org/rfc/rfc9110.html#section-15).
+A complete HTTP 403 response has `outcome: "success"` and MAY carry
+`status_code: 403`. A known final status MAY also be retained if the response
+body subsequently fails or is interrupted; it does not change the existing
+`outcome` or `error` requirements.
+
 ### Durable memory and configuration
 
 Memory writes cover creation, replacement, or upsert of durable agent context
@@ -181,9 +196,9 @@ After acceptance, update the canonical specification, both JSON Schemas,
 their published website copies, focused valid/invalid fixtures, and website
 status text. Keep protocol semantics in `spec/` rather than duplicating them
 in website source. Fixtures cover required operation identity, protocol and
-port constraints, terminal outcome/error combinations, optional metrics,
-and configuration creation, update, deletion, and null values. Existing
-valid fixtures, including native `ask`, remain valid.
+port constraints, terminal outcome/error combinations, optional response
+status and metrics, and configuration creation, update, deletion, and null
+values. Existing valid fixtures, including native `ask`, remain valid.
 
 Schema validation verifies document shape. Correlation, accurate capability
 claims, timing, policy enforcement, and redaction require implementation
@@ -238,11 +253,12 @@ signature, or audit record is required.
 - [RFC 8174: Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words](https://www.rfc-editor.org/rfc/rfc8174).
 - [RFC 0001](./0001-agent-hook-core-event-contract.md): Agent Hook 0.1 Core Event Contract (Draft).
 - [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12): schema dialect used by the repository.
+- [RFC 9110, Section 15](https://www.rfc-editor.org/rfc/rfc9110.html#section-15): HTTP response status codes.
 
 ### Informative references and attribution
 
 The selected network, memory, and configuration event concepts are adapted
-from Brian Chuang's [PR #1](https://github.com/trendmicro/agent-hook-standard/pull/1),
+from Brian Chuang's [PR #1](https://github.com/trendmicro/agent-hook-unity/pull/1),
 commit `4beb7b79190b3dfdfd85e42c2b53f71483b2db6c`. This proposal changes their
 scope, correlation, configuration representation, and capability requirements.
 It does not supersede the remaining work in that PR. RFC numbers 0002 and

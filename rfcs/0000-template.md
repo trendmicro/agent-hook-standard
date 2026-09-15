@@ -1,7 +1,7 @@
 ---
 title: "RFC: Short, descriptive title"
 status: Draft
-discussion: "https://github.com/trendmicro/agent-hook-standard/discussions/<number>"
+discussion: "https://github.com/trendmicro/agent-hook-unity/discussions/<number>"
 review-start: YYYY-MM-DD
 review-end: YYYY-MM-DD
 maintainer-votes:

@@ -5,9 +5,10 @@ protocol for AI agents and their tooling. It will let agent builders describe
 events, hook payloads, hook responses, and security telemetry using a shared,
 interoperable model.
 
-The 0.1 draft defines thirteen canonical Core `hook_event_name` values across
+The revised 0.1 draft defines eighteen canonical Core `hook_event_name` values across
 session and turn lifecycle, user prompts, model requests and responses, tool
-use, permission outcomes, and subagent delegation. Hosts publish the Core
+use, permission outcomes, subagent delegation, application network requests,
+durable memory writes, and configuration changes. Hosts publish the Core
 boundaries and gate behavior they can observe and enforce faithfully. Each
 per-event capability claim is `gate`, `observe`, `partial`, or `unavailable`;
 an unavailable claim is not evidence that the underlying activity did not
@@ -16,9 +17,11 @@ occur.
 ## Status
 
 The repository contains an adoption-ready Agent Hook 0.1 draft proposed by
-[RFC 0001](rfcs/0001-agent-hook-core-event-contract.md). It is not active until
+[RFC 0001](rfcs/0001-agent-hook-core-event-contract.md), with five additional
+standard events proposed by
+[RFC 0004](rfcs/0004-standard-lifecycle-events.md). It is not active until
 accepted through the RFC process. Join the
-[GitHub Discussions](https://github.com/trendmicro/agent-hook-standard/discussions)
+[GitHub Discussions](https://github.com/trendmicro/agent-hook-unity/discussions)
 to help shape it.
 
 ## Repository map
@@ -32,11 +35,26 @@ to help shape it.
 
 ## Local setup
 
-Install the validator and website dependencies separately:
+Use Node.js 20 or later; CI validates and builds with Node.js 24.
+From the repository root, install the validator and website dependencies
+separately:
 
 ```sh
 npm ci
 npm ci --prefix website
+```
+
+Validate the schemas and fixtures, then build the website:
+
+```sh
+npm run validate
+npm run build
+```
+
+To preview the website locally, run:
+
+```sh
+npm start
 ```
 
 ## Participate
@@ -45,6 +63,13 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before contributing. The decision
 process, voting rules, and RFC lifecycle are defined in
 [GOVERNANCE.md](GOVERNANCE.md). For sensitive matters, follow
 [SECURITY.md](SECURITY.md).
+
+### Keep the website in sync
+
+Every pull request must review its website impact and update affected website
+content in the same PR. Follow the [website synchronization checklist](CONTRIBUTING.md#website-synchronization)
+for canonical spec pages, site summaries, and published schema copies. Explain
+the website updates in the PR, or why no website change is needed.
 
 ## Licenses
 

@@ -177,6 +177,21 @@ For this event, `success` means the request and response completed at the
 application protocol boundary, not that the application accepted the request.
 For example, a complete HTTP error-status response is a `success` outcome.
 
+`status_code` MAY contain an integer response status in the namespace of the
+declared `protocol`. It MUST describe this request's response, not a later
+redirect or retry. It MUST be omitted when no response status is available or
+the protocol has no integer response status; hosts MUST NOT substitute local
+transport errors or a synthetic zero. For protocols with interim responses,
+only the final response status MAY be reported; if no final status was
+observed, the field MUST be omitted.
+
+For HTTP(S), use the HTTP response status code defined by
+[RFC 9110, Section 15](https://www.rfc-editor.org/rfc/rfc9110.html#section-15).
+For example, a complete HTTP 403 response has `outcome: "success"` and MAY
+carry `status_code: 403`. A known final status MAY also be retained if the
+response body subsequently fails or is interrupted; it does not change the
+existing `outcome` or `error` requirements.
+
 `bytes_sent` and `bytes_recv` MAY contain non-negative integer counts of the
 serialized application request and response body bytes observed for this
 request, respectively, as transmitted and before content decoding. A body

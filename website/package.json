@@ -19,7 +19,7 @@
     "react-dom": "^19.0.0"
   },
   "overrides": {
-    "@docusaurus/mdx-loader": "file:../vendor/docusaurus-mdx-loader",
+    "@docusaurus/mdx-loader": "file:../third_party/docusaurus-mdx-loader",
     "qs": "6.16.0",
     "serialize-javascript": "7.1.1",
     "uuid": "11.1.1"
