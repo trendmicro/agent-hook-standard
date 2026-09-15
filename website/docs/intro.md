@@ -29,6 +29,15 @@ contains eighteen standard events. A host can support the events it can expose
 faithfully and declare the rest unavailable. Local agents can adopt the event
 contract without enterprise identity, remote approval, or audit services.
 
+### Draft response-inspection proposal
+
+[RFC 0005 / PR #8](https://github.com/trendmicro/agent-hook-unity/pull/8) proposes
+extending `PostNetworkAccess` to inspect, replace, or withhold response content
+before an agent receives it. It keeps the existing Pre/Post pair and all
+eighteen event names. The RFC is a draft awaiting the prerequisite Discussion
+and formal review; it has not been adopted. The published 0.1 draft still
+defines `PostNetworkAccess` as Observe and ignores its control responses.
+
 ## Get involved
 
 - Bring a use case or question to [GitHub Discussions](https://github.com/trendmicro/agent-hook-unity/discussions).

@@ -8,6 +8,13 @@ RFC numbers are four digits and assigned in sequence. Do not reuse a number.
 Accepted RFCs remain here as the decision record; their resulting normative
 content belongs in [`../spec/`](../spec/README.md).
 
+An RFC number identifies a proposal, not a pull request or a commit. Revisions
+to the same proposal update its existing numbered file. Implementation and
+follow-up PRs reference that RFC without creating a new RFC for every PR.
+Create a new numbered RFC for a distinct substantial proposal; routine fixes
+and documentation updates do not each need an RFC. See the
+[contribution guidance](../CONTRIBUTING.md#discussing-ideas-and-reporting-issues).
+
 See [GOVERNANCE.md](../GOVERNANCE.md) for review, voting, and status rules.
 
 ## Response inspection proposal
