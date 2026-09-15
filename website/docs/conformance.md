@@ -20,6 +20,13 @@ npm run validate
 npm run build
 ```
 
+Use the <Link to="/capabilities">capability declaration guide</Link> to document
+the host and adapter versions, every Core event's mode, limitations, and
+supporting evidence. Its fictional example is informative and is not a tested
+host claim or a required configuration format. The
+<Link to="/responses">response reference</Link> summarizes the existing
+event-specific controls and identifies unresolved portable behavior.
+
 Schema validation proves document shape, not complete runtime behavior. An
 adapter review must additionally verify correct event mapping, `event_id`
 correlation, decision handling, and the required fail-open behavior for invalid,

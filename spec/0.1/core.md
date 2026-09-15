@@ -168,6 +168,65 @@ enforcement MUST use a native mechanism or a future explicitly configured
 profile; it MUST NOT reinterpret an Agent Hook failure as an implicit block
 while claiming 0.1 default behavior.
 
+## Host obligations
+
+For one event delivery to one handler, the host and its adapter have the
+responsibilities below. This section collects the existing requirements for
+implementers; the linked clauses define their scope. The table is a reading
+guide, not a new execution order for native policy checks or multiple handlers.
+
+| Responsibility | What the host or adapter does | Existing definition |
+| --- | --- | --- |
+| Declare the actual boundary | Publish a mode for every Core event. Claim `gate` only when the registry classifies the event as a Gate and the host can faithfully observe and enforce it. Declare limitations; do not normalize a `partial` or `unavailable` signal into a Core event. | [Versioning and conformance](#versioning-and-conformance) |
+| Construct a faithful event | Emit a schema-valid event at the event's defined boundary, with the required delivery, session, turn, and operation identifiers. Preserve correlation through the adapter. Omit optional context that cannot be supplied faithfully and apply the existing redaction rules. | [Event envelope](#event-envelope), [security correlation](#security-correlation), [data minimization](#data-minimization-and-redaction), [event registry](./events.md#core-event-registry) |
+| Validate and pair the response | Check the response schema and match `event_id` to this delivery. If `hookSpecificOutput` is present, also match its `hookEventName` to the event's `hook_event_name`. Schema validation alone does not establish these cross-document matches. | [Response envelope](#response-envelope) |
+| Apply the event's Gate control | Interpret control only for a registry Gate declared `gate`. Apply that event's response shape and effect, including its rewrite support where defined. A valid denial prevents the action at the stated boundary. The network, memory, and configuration Gates require reevaluation if the presented operation, target, or proposed values change before dispatch or mutation. | [Response envelope](#response-envelope), [Gate and Observe semantics](./events.md#gate-and-observe-semantics) |
+| Keep Observe responses observational | Ignore response controls for control purposes on an `observe` event. Diagnostic or observational retention is optional; retaining a response does not authorize changing the observed action. | [Response envelope](#response-envelope), [Gate and Observe semantics](./events.md#gate-and-observe-semantics) |
+| Preserve native authority | An Agent Hook `allow` passes only that hook's native gate. Sandbox, organization, managed-policy, and user-approval restrictions still apply. Follow the event-specific approval semantics: `PreNetworkAccess`, `PreMemoryWrite`, and `PreConfigChange` use native approval for `ask`, treat `ask` as `deny` on a non-interactive host, and do not treat `defer` as approval. | [Response envelope](#response-envelope) |
+| Handle response failures | An absent or unusable response supplies no Agent Hook control result. For a declared Gate, continue the affected operation unless an independent native policy blocks it. Adapters should record the minimal diagnostics described below. | [Fail-open behavior](#fail-open-behavior) |
+
+### Response-failure reference
+
+All conditions in this table have the same outcome under the existing
+[fail-open rule](#fail-open-behavior): no Agent Hook control result. For an
+event declared `gate`, the operation continues unless independent native
+policy blocks it. For an `observe` event, a response has no control effect in
+the first place.
+
+| Condition | Why it is not a valid control result |
+| --- | --- |
+| Absent response | The handler supplies no response document. |
+| Invalid JSON | The response cannot be parsed as JSON. |
+| Schema-invalid response | The response does not satisfy the Hook Response schema. |
+| Correlation mismatch | `event_id` does not identify this delivery, or a present `hookSpecificOutput.hookEventName` does not match the event name. |
+| Handler error | The host or adapter observes a handler failure. |
+| Timeout | The handler does not complete within the host's timeout; 0.1 does not define the timeout value. |
+
+An absent response means no response document. A schema-valid document that
+omits optional control members is a different case; this table does not define
+a general default decision for it.
+
+The existing diagnostic recommendation is to retain the event ID, hook event
+name, failure class, and handler identity without retaining sensitive event
+data. These are diagnostic contents, not a new record schema or audit transport.
+Recording a failure does not turn it into a denial or an approval.
+
+### Boundaries still open in 0.1
+
+The following questions are not resolved by consolidating the existing host
+requirements. They need explicit design decisions before implementations can
+rely on a shared behavior:
+
+| Question | Current boundary |
+| --- | --- |
+| Common-field precedence on a Gate | The schema accepts common members such as `continue` and `stopReason`, but 0.1 does not fully define their interaction with event-specific Gate controls. For example, it does not define a portable precedence rule for `continue: false` together with `permissionDecision: "allow"`. The existing Observe control-ignore rule still applies. |
+| A rewrite that fails native validation | The response envelope identifies the events that accept `updatedInput` or `updatedMessages`. It does not fully define how a host handles a schema-valid response whose replacement fails a native tool or model-input constraint. Such a failure is distinct from a response that fails the Hook Response schema; the response-failure table does not choose a replacement, retry, or rejection policy for it. |
+| Failure to construct a valid event | Producers still owe schema-valid, faithful events and accurate capability declarations. The fail-open clause covers response and handler failures; it does not define a general disposition of the pending operation when the producer cannot construct a valid event. Fabricating missing data or treating an unfaithful signal as a normalized Core event would violate the existing requirements. |
+
+Handler ordering, response composition, transport bindings, and asynchronous
+approval workflows remain outside this section's scope. No fail-closed mode or
+new approval mechanism is introduced here.
+
 ## Versioning and conformance
 
 `spec` is a major/minor contract identifier. A 0.1 implementation MUST emit and
