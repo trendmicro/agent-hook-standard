@@ -64,6 +64,13 @@ process, voting rules, and RFC lifecycle are defined in
 [GOVERNANCE.md](GOVERNANCE.md). For sensitive matters, follow
 [SECURITY.md](SECURITY.md).
 
+### Keep the website in sync
+
+Every pull request must review its website impact and update affected website
+content in the same PR. Follow the [website synchronization checklist](CONTRIBUTING.md#website-synchronization)
+for canonical spec pages, site summaries, and published schema copies. Explain
+the website updates in the PR, or why no website change is needed.
+
 ## Licenses
 
 Specifications and documentation are licensed under
