@@ -1,5 +1,5 @@
 ---
-title: "RFC 0005: Inspect network response bodies before delivery"
+title: "RFC 0005: Inspect and control response content with PostNetworkAccess"
 status: Draft
 discussion: "Pending — repository Discussions are not enabled"
 review-start: "Not started"
@@ -10,313 +10,300 @@ supersedes: []
 superseded-by: []
 ---
 
-# RFC 0005: Inspect network response bodies before delivery
+# RFC 0005: Inspect and control response content with PostNetworkAccess
 
 ## Summary
 
-Propose `BeforeNetworkResponseDelivery`, a Core Gate for inspecting a complete
-network response body before an agent or tool caller can consume it. A valid
-denial prevents delivery of that body. A host may implement quarantine under
-its own storage and retention policy.
+Extend `PostNetworkAccess` so a capable host can inspect, replace, or withhold
+a complete network response body before an agent or tool caller receives it.
+Keep the two existing network events and the current count of 18 Core events:
 
-Preserve `PostNetworkAccess` as the Observe event for a request's terminal
-network result. Receiving a response successfully and permitting its content
-to reach an agent are separate outcomes: a completed HTTP response can be
-recorded as network `success` even when delivery of its body is denied.
+| Event | Question | Controlled action |
+| --- | --- | --- |
+| `PreNetworkAccess` | May this request be sent? | Dispatching the outbound application request. |
+| `PostNetworkAccess` | How did the request finish, and may its response content reach the caller? | Delivering the buffered response body, when the host declares `gate`. |
 
-This RFC targets a subsequent revision of the **unaccepted Agent Hook 0.1
-draft**. It does not add an event to the current schemas or registry, which
-still contain 18 Core events. The proposed name, fields, and semantics below
-are for review, not a claim of current conformance or vendor endorsement.
-Formal review has not started. A prior GitHub Discussion and the review window
-required by [GOVERNANCE.md](../GOVERNANCE.md) must precede a decision; repository
+The host receives the response into a trusted buffer before the consumer can
+access it. A Post handler can allow the body, allow a replacement body, or deny
+delivery. A host that only reports network results retains `observe` behavior.
+The Core fail-open default is preserved.
+
+This is a proposal for a subsequent revision of the **unaccepted Agent Hook
+0.1 draft**. Current main classifies `PostNetworkAccess` as Observe and requires
+hosts to ignore its control responses. This RFC proposes changing that contract;
+it does not change the canonical specification, schemas, or runtime behavior
+in this PR. No new event name is proposed.
+
+Formal review has not started. The prerequisite Discussion and review window
+required by [GOVERNANCE.md](../GOVERNANCE.md) remain pending; repository
 Discussions are currently disabled. This Draft PR is preparatory material.
 
 ## Motivation
 
-A network destination may be permitted while its response contains content
-that a host policy prohibits an agent from consuming. For example, a download
-from an allowed host may contain an executable where only text is permitted.
-The host needs a boundary at which it still controls delivery of the body and
-can apply a handler's decision.
+An allowed destination can return content that a policy prohibits an agent
+from consuming. Request-side checks cannot inspect bytes that have not yet
+arrived. Response-side checks can withhold a prohibited download or replace
+sensitive text with a sanitized representation.
 
-The current [network events](../spec/0.1/events.md#prenetworkaccess) answer two
-different questions:
-
-- `PreNetworkAccess`: may this application-level request be dispatched?
-- `PostNetworkAccess`: how did this started request finish at the network
-  protocol boundary?
-
-Neither event currently defines a decision about releasing a complete buffered
-response body to a consumer. Giving `PostNetworkAccess` that meaning would
-combine terminal network telemetry with a separate consumer-delivery decision.
-A separate event makes the protection and its limits explicit while keeping
-existing handlers' interpretation of network results.
+Using the existing Pre/Post pair keeps this distinction easy to implement and
+explain. `Post` means the network operation has reached its terminal result;
+the host can still control the subsequent delivery of its buffered body.
+Network success and content approval remain separate facts within this flow.
 
 ## Proposal
 
-### Scope and terminology
+The key words MUST, MUST NOT, SHOULD, and MAY below describe the **proposed**
+contract, using the terminology of the [Core protocol](../spec/0.1/core.md).
 
-The requirements in this section describe the **proposed** contract. The key
-words MUST, MUST NOT, SHOULD, and MAY carry the same meaning as in the
-[Core protocol](../spec/0.1/core.md#status-and-terminology).
+### 1. Event timing and scope
 
-The **consumer** is the agent, tool caller, or another downstream recipient
-whose access to the response body the host controls. The **trusted mediator**
-is the host component that receives, buffers, and submits the body to an
-authorized handler. The mediator and handler are outside that protected
-consumer boundary.
-
-Each Gate concerns one delivery attempt to one consumer, identified by
-`delivery_id` and `consumer_id`. It does not authorize every possible recipient
-of that network response. A host MUST assign a stable, nonempty `consumer_id`
-within a session and distinguish separately controlled recipients. It MUST
-document what a consumer represents and how that identity maps to native
-agents, tool callers, or other recipients; no global identity registry is
-introduced.
-
-This first proposal covers one complete, finite response body buffered before
-consumer access. It does not define:
-
-- Incremental release or per-chunk approval for a streaming response.
-- Inspection or rewriting of all HTTP headers, cookies, or protocol metadata.
-- Body replacement, sanitization, a malware detector, or a claim that a
-  particular inspection establishes content safety.
-- Kernel or socket enforcement, rollback of a remote action, or prevention of
-  data already sent in the original request.
-- Quarantine storage, retention, a release-from-quarantine API, cryptographic
-  signing, remote approval tokens, or an asynchronous HITL protocol.
-
-Native mechanisms may provide these additional capabilities under a separate
-contract. In particular, a native quarantine may retain or delete denied
-content; the portable effect proposed here is **withholding its delivery**.
-
-### Event boundary
-
-Unless stated otherwise, per-event requirements apply only when the host
-declares this event `gate` or `observe`. A `partial` or `unavailable`
-capability MUST NOT emit it as a normalized Core event.
-
-A producer MUST emit `BeforeNetworkResponseDelivery` after it has received
-and buffered one complete application-level response body, and before any
-bytes of that body become available to the consumer. A host declaring `gate`
-MUST retain control of that buffer until the decision or failure handling
-described below permits delivery or denies it.
-
-Consumer access includes a readable temporary file, shared memory, stdout, a
-callback, or a stream, as well as returning bytes directly. A host MUST NOT
-claim that this Gate protected a complete response if it already exposed any
-part of that body to the consumer. A transport that receives chunks may
-qualify if the host buffers the entire finite body and releases none of it
-before resolving this Gate; that is not incremental streaming delivery.
-
-The event applies when a complete response body is about to be delivered,
-including an empty body or the body of a complete HTTP error-status response.
-A transport failure or interruption yielding an incomplete body is outside
-this proposal's delivery scope. Hosts MUST NOT label a partial body as complete
-to emit this event; handling that partial result remains a native concern.
-
-A request whose body is never offered for delivery does not need this event.
-For a host declaring `gate`, every complete-body delivery in its declared
-configuration MUST pass this boundary. A refusal by an independent native
-policy may stop delivery before any handler invocation.
-
-### Relationship to the existing network events
-
-For a request whose complete body will be delivered, a host supporting all
-three boundaries follows this order:
+For a successful request with content to deliver, a host declaring `gate`
+MUST follow this order:
 
 ```text
-PreNetworkAccess (request dispatch decision)
-  -> request sent; complete response received into a trusted buffer
-  -> PostNetworkAccess (terminal network result, Observe)
-  -> BeforeNetworkResponseDelivery (body delivery decision)
-       allow / resolved native approval -> release the evaluated body
-       deny                            -> withhold the body
-       handler failure                 -> Core fail-open / native policy
+PreNetworkAccess: decide whether the request may be sent
+  -> send request; receive the complete response into a trusted buffer
+  -> PostNetworkAccess: report the network result and evaluate the body
+       allow                -> deliver the evaluated body
+       allow + replacement  -> deliver the replacement body
+       deny                 -> withhold the body
+       handler failure      -> no new hook decision; apply fail-open/native policy
 ```
 
-`PostNetworkAccess` MUST describe the actual terminal network result. A later
-delivery denial MUST NOT relabel a completed transfer as network `failure` or
-`interrupted`, or cause another terminal Post event. If the transfer itself
-fails or is interrupted, its Post event reports that result, and the complete
-body Gate does not apply.
+The **consumer** is the intended agent, tool caller, or other recipient for
+this response. The host's trusted buffering component and the authorized
+inspection handler are outside that consumer boundary. Before invoking a
+controlling Post handler, the host MUST ensure that no body bytes are already
+accessible to the consumer through a return value, callback, stream, stdout,
+shared memory, or a readable temporary file.
 
-The three capabilities are independent. A host can support this proposed
-delivery boundary without a faithful native request-dispatch hook; it MUST
-declare the other events accurately instead of inventing them. When a host
-observes both the network terminal result and the delivery Gate, its emission
-order and session `sequence` MUST place the terminal Post before the Gate.
+`PostNetworkAccess` retains exactly one terminal occurrence per started network
+request whose result the host observes. It MUST be reported for failures and
+interruptions as well as successes. Delivery to multiple handlers or
+reevaluation is a delivery of that same occurrence, not another completed
+network request: use a fresh `event_id` and session `sequence`, while retaining
+`operation_id`, `prompt_id`, the original target, and the terminal network facts.
+The occurrence's `timestamp` remains the time its terminal result was observed.
+Native invocation order and handler composition remain host-defined.
 
-If both events provide `status_code` for the same `operation_id`, the values
-MUST match. The Gate reports the original response's protocol status, not a
-locally generated delivery error or a later redirect's status.
+A failed or interrupted transfer has no complete body to control under this
+proposal. Its Post event MUST retain the existing `error` requirements and
+MUST NOT include the proposed complete-body fields. Handler controls on that
+event have no effect. A host declaring this full-body Gate MUST NOT release
+partial bytes as if they had passed inspection; it may return a native error
+without those bytes. Handling partial content outside that guarantee requires
+an accurately declared capability limitation.
 
-Redirects and retries remain separate requests with separate `operation_id`
-values. This Gate uses the identifiers and original target of the request
-that produced this body. A redirect response body that is discarded internally
-does not need a delivery Gate; following the redirect still creates a new
-request subject to the existing `PreNetworkAccess` rules.
+Every complete-body delivery in the declared `gate` configuration MUST pass
+the Post control boundary. When a complete response will not be delivered
+(for example, a native policy already discarded it), the host still reports
+its terminal Post result but MAY omit the delivery fields. Such an invocation
+has no delivery-control effect; omission MUST NOT be used to bypass inspection
+and then release the body.
 
-### Proposed request fields
+Pre and Post support remain independent. Redirects and retries remain distinct
+requests with distinct `operation_id` values. A host MUST NOT fabricate a Pre
+event when it can only observe Post.
 
-The request keeps the existing flat envelope. It MUST NOT use a generic
-`payload` or `context`, or replace `hook_event_name` with `event_type`.
+### 2. Preserve the actual network result
 
-| Member | Requirement | Meaning |
-| --- | --- | --- |
-| `spec`, `event_id`, `session_id`, `timestamp`, `sequence` | Required | Existing common envelope requirements, including a unique delivery UUID and strictly increasing session sequence. |
-| `hook_event_name` | Required | Exactly `BeforeNetworkResponseDelivery`. |
-| `prompt_id` | Required | The caller-initiated turn to which the request and delivery belong. |
-| `operation_id` | Required | The underlying network request's identifier, retained across its related network and delivery events. |
-| `delivery_id` | Required | A nonempty opaque identifier, unique within the session, for one attempt to deliver this body to one consumer. |
-| `consumer_id` | Required | The nonempty opaque identifier of the intended consumer within this session. |
-| `destination_host`, `destination_port`, `protocol` | Required | This request's original destination and lowercase application protocol, following the existing network-event constraints. |
-| `response_body_base64` | Required | The complete body bytes proposed for consumer delivery, encoded as standard padded base64 without whitespace. An empty string represents an observed empty body. |
-| `status_code` | Optional | The final status in the declared protocol's namespace, following the existing `PostNetworkAccess` status rules. |
-| `response_media_type` | Optional | A nonempty media type when known. This is advisory metadata, not a content-safety guarantee. |
-| `extensions` | Optional | Existing reverse-DNS extension namespaces. |
+`outcome`, `error`, `status_code`, `bytes_sent`, `bytes_recv`, and `duration_ms`
+retain their current [network-result meanings](../spec/0.1/events.md#postnetworkaccess).
+In particular:
 
-Other optional common envelope members retain their existing meaning. When
-the native runtime lacks an operation identifier, an adapter MUST generate
-and retain one for the request using the existing
-[correlation requirements](../spec/0.1/core.md#security-correlation); it MUST
-NOT derive paired-event identity from timing alone. Redelivery or reevaluation
-uses a new `event_id` and sequence while retaining the request's operation ID.
+- A complete HTTP 403 or 500 response still has network `outcome: "success"`.
+- Withholding or replacing its body MUST NOT change that outcome or status.
+- Wire byte counts MUST NOT be replaced by decoded or replacement-body sizes.
+- A local refusal or body-processing error MUST NOT become a fabricated
+  network status or an additional terminal Post occurrence.
 
-A host MUST retain `delivery_id` across handler invocations, event redelivery,
-and reevaluation for the same delivery attempt. A new attempt after denial,
-or an attempt to release the body to a different consumer, MUST have a new
-`delivery_id` and a fresh Gate. `consumer_id` MUST remain stable for an attempt;
-an allow for one consumer MUST NOT authorize release to another. The correlated
-response's `event_id` binds its decision to these request fields without adding
-another response envelope.
+The handler's decision describes content delivery. It cannot undo the request,
+remove information already sent, or roll back the remote server's actions.
 
-### The evaluated body and the delivered body
+### 3. Response content and recipient
 
-The bytes decoded from `response_body_base64` MUST be exactly the bytes the
-host proposes to release to the consumer. The representation is after the
-host's content decoding, such as decompression, and before consumer parsing.
-It is not necessarily the compressed bytes received on the wire. In
-particular, its decoded length MUST NOT be substituted for the existing
-`PostNetworkAccess.bytes_recv`, which counts transmitted body bytes.
+Keep the existing flat envelope, required Post fields, correlation rules, and
+event name. Add the following proposed event members:
 
-Character-set decoding, replacement of invalid character sequences, Unicode
-normalization, and structured parsing count as consumer parsing for this
-byte-oriented proposal. The Gate MUST precede those operations. A runtime
-that exposes only a decoded string or parsed object, without a faithful
-earlier byte boundary, MUST declare `partial` or `unavailable`; re-encoding that
-value as UTF-8 does not establish what the original consumer-facing bytes were.
-This RFC does not standardize the consumer's subsequent parsing behavior.
-
-The producer MUST provide valid base64 that decodes to the complete proposed
-body. A hash, a storage path, a prefix such as the first 16 bytes, a truncated
-sample, or a redacted substitute cannot replace the required full body. A
-handler may choose to inspect only a prefix, but the event does not assert
-that this establishes the safety of the remaining content.
-
-A decision applies only to the identified delivery attempt and consumer, and
-the body, target, and delivery metadata presented in that event. The host MUST
-prevent modification or substitution of the buffer between evaluation and
-release. If it changes any security-relevant
-part of that proposal, including content decoding or sanitization that changes
-the body, it MUST evaluate a new Gate before release. This requirement does
-not mandate hashes or signatures; it requires faithful host enforcement.
-
-### Proposed control response
-
-Reuse the correlated Core response envelope: required `spec` and matching
-`event_id`, with matching
-`hookSpecificOutput.hookEventName: "BeforeNetworkResponseDelivery"`.
-`hookSpecificOutput.permissionDecision` uses the existing vocabulary:
-
-| Decision | Proposed effect |
+| Member | Requirement and meaning |
 | --- | --- |
-| `allow` | Permit delivery of the evaluated body, subject to independent native, sandbox, organization, and approval policies. |
-| `deny` | Prevent delivery of the body. The host may return a locally generated refusal or error that does not expose the denied body. |
-| `ask` | Keep the body unavailable while the native approval flow resolves the delivery decision. A non-interactive host MUST treat it as `deny`. |
-| `defer` | Leave resolution to native approval or policy; it MUST NOT count as approval. |
+| `response_body_base64` | Required when a `gate` Post offers a complete body for delivery. Standard padded base64 without whitespace, representing every byte of the current body proposed for delivery. An observed empty body is an empty string. |
+| `consumer_id` | Required with `response_body_base64`. A nonempty opaque session-local identity for the intended recipient; stable across evaluations for this request. |
+| `response_media_type` | Optional nonempty media type, when known. Advisory metadata, not evidence that content is safe. |
 
-`permissionDecisionReason` MAY explain the decision without disclosing
-protected content or policy details. A structurally valid response without a
-decision supplies no hook control result. Top-level `decision: "block"`,
-`updatedInput`, `updatedMessages`, and other event-inapplicable control members
-MUST have no delivery-control or body-rewriting effect for this event.
+These fields apply only to `outcome: "success"`. An `observe` host MAY include
+them if it can supply the complete representation and intended recipient
+faithfully; their presence does not grant control authority or assert that
+delivery has not occurred. A partial body, prefix, hash, path, or privacy-redacted
+copy of the current buffer MUST NOT be labeled as that complete buffer. An
+authorized replacement becomes the current buffer for subsequent invocations.
+Observe telemetry may omit these members without losing its existing
+terminal-result meaning.
 
-This RFC introduces no `transform` or `quarantine` decision enum. `deny`
-withholds delivery; any quarantine storage or later release follows a
-separately defined native policy. A later attempt by this host to deliver a
-previously denied body, whether unchanged or modified, MUST invoke a fresh Gate
-with new `delivery_id` and `event_id` values before release. Retention in native
-quarantine does not authorize delivery. This RFC does not define reusable
-approval grants.
+The host MUST document how `consumer_id` maps to native agents, tool callers,
+or other separately controlled recipients. The correlated response `event_id`
+binds a handler decision to this recipient, request, and proposed body. A decision
+MUST NOT be reused for a different recipient. This proposal controls the
+response to the request's intended consumer; fan-out, reusable delivery grants,
+and later release from quarantine are outside its portable contract.
 
-The existing [Core fail-open rule](../spec/0.1/core.md#fail-open-behavior)
-remains unchanged. An absent response, invalid JSON or schema, event ID or
-event-name mismatch, handler error, or timeout supplies no hook control result;
-a host declaring `gate` MUST continue delivery unless an independent native
-policy blocks it. A hook failure MUST NOT be reported as an implicit `deny`.
-Common async fields do not establish a new remote approval or body-holding
-protocol for this Gate.
+The byte boundary is after content decompression and before character-set
+decoding, invalid-character replacement, Unicode normalization, or structured
+parsing. The first controlling invocation contains the complete decoded
+network body. A later invocation following an authorized replacement contains
+the current replacement bytes, while the network-result fields remain intact.
+A runtime exposing only a string or parsed object cannot establish this
+original byte boundary by re-encoding that value.
 
-Consequently, this proposal does not promise that every delivered response
-has completed a successful scan. An explicitly configured native policy may
-require that stronger guarantee, but it is not the Core default.
+The host MUST retain control of the evaluated buffer until the decision is
+resolved. An allow applies only to its evaluated body or explicit replacement.
+Other buffer changes require reevaluation against the changed body before
+release; an earlier valid deny remains a denial. The request's actual target
+MUST NOT be changed during reevaluation, and changing the recipient is outside
+this request-continuation contract. Reevaluation uses the same terminal
+occurrence and request identifiers, with a fresh `event_id` and sequence.
+It MUST NOT rewrite the original network facts.
 
-### Buffering, privacy, and capability declarations
+### 4. Event-specific control and body replacement
 
-Adding the proposed event would require each host's capability declaration to
-include one of the existing modes for it:
+Reuse the correlated response envelope: required `spec`, matching `event_id`,
+and `hookSpecificOutput.hookEventName: "PostNetworkAccess"`. Delivery controls
+apply only when the host declares `gate`, the event has `outcome: "success"`,
+and the complete body and recipient fields are present.
 
-| Mode | Meaning at this boundary |
+| `hookSpecificOutput.permissionDecision` | Effect |
 | --- | --- |
-| `gate` | The host observes a complete body before consumer access, supplies it faithfully, and can enforce the applicable delivery decision. |
-| `observe` | The host faithfully emits this same before-delivery event, but handler responses do not control delivery. |
-| `partial` | The host has a related signal but cannot meet the timing, full-body, correlation, privacy, or control obligations. It MUST NOT emit a normalized Core event for this capability. |
-| `unavailable` | The host cannot observe this boundary faithfully. |
+| `allow` | Permit delivery of the evaluated body, or the explicit replacement below, subject to independent native policies. |
+| `deny` | Withhold the body. The host may return a safe local refusal without exposing denied bytes. |
+| `ask` | Keep the body unavailable until the existing native approval flow resolves. A non-interactive host MUST treat this as `deny`. |
+| `defer` | Leave the decision to native approval or policy; this is not approval. |
 
-Hosts MUST document supported protocols, buffering limits, consuming runtime
-paths, and data-handling restrictions for the declared configuration. A host
-MUST NOT claim `gate` while silently falling back to incremental or uninspected
-delivery for oversized bodies or unsupported paths. It may reject such delivery
-under a separately declared native resource policy, or declare that the
-configuration cannot faithfully support the Gate. A rejected buffer allocation
-or decoding failure is a native resource/transport failure, not a fabricated
-complete-body event or handler denial. Once a valid event is submitted, a
-handler's size-limit error still follows the Core fail-open rule.
+`permissionDecisionReason` MAY explain the decision. Introduce one replacement
+member: **`hookSpecificOutput.updatedResponseBodyBase64`**. When present it MUST
+be a string containing valid standard padded base64 without whitespace. An
+empty string represents a deliberate empty replacement, not an omitted value.
+Its replacement effect applies only with an explicit `permissionDecision: "allow"`.
+With `deny`, `ask`, `defer`, or no decision, it has no replacement effect;
+in particular, a denial MUST NOT release replacement bytes.
 
-Bodies can contain credentials, source code, personal data, or attacker-controlled
-content. The host MUST apply its disclosure policy before selecting and invoking
-a handler. Base64 is a transport representation, not redaction or encryption.
-When the full body cannot be disclosed safely, the host must use an authorized
-handler that can process it, such as a local handler, or declare the capability
-limitation. It MUST NOT replace sensitive bytes and claim it evaluated the
-original full body. A handler MUST treat the body as untrusted data, not as
-instructions or executable content.
+For a valid allow with a replacement, the host MUST deliver exactly the decoded
+replacement bytes, subject to native policy and any remaining configured
+handlers. Editing an event copy is insufficient. The authorized replacement
+does not require repeatedly invoking the same handler just because it changed
+the body. If another handler is expected to inspect the final content, the host
+MUST present it with the replacement, not the earlier body. A decision about an
+earlier representation MUST NOT be reported as an inspection of the replacement.
 
-### Recording a delivery denial
+Replacement changes the body only. It does not change the recorded network
+status, target, or wire counts, and MUST preserve the declared media type.
+The host MUST reconcile or remove stale native delivery metadata such as
+content length, content encoding, checksums, and validators before exposing
+the replacement. It MUST NOT claim that a signature over the original body
+authenticates the replacement. If the host cannot apply a valid replacement
+faithfully, it MUST stop delivery with a native error rather than fall back to
+the original sensitive body. That host application failure is distinct from
+an invalid or missing handler response.
 
-A host SHOULD record the event, operation, delivery, consumer, and turn
-identifiers, the handler decision or failure class, and the actual delivery
-outcome in its diagnostics.
-It SHOULD omit the response body and sensitive metadata from those records.
-This RFC does not prescribe a ledger format or add a terminal delivery event.
-An `allow` response alone is not evidence that delivery ultimately occurred.
+This event gives no delivery-control or rewriting effect to `updatedInput`,
+`updatedMessages`, top-level `decision`, or other event-inapplicable controls. It adds no
+`transform` or `quarantine` decision enum. A valid deny withholds the body;
+quarantine storage, retention, deletion, and any later release remain native
+responsibilities. Retaining denied content MUST NOT make it readable to the
+consumer or authorize a later release under the original decision.
 
-A handler denial MUST NOT fabricate a `PermissionDenied` event. Existing
-permission events may be used only when the native approval boundary and all
-their required fields and correlation rules are satisfied. Likewise, denial
-does not create a second `PostNetworkAccess` or change its terminal outcome.
+Hosts MUST document handler ordering, replacement visibility, and how they
+combine applicable decisions. They MUST serialize body replacements or otherwise
+resolve concurrent proposals against the exact buffer each handler evaluated
+before delivery. If a later replacement invalidates an earlier inspection
+that the host relies on for the final body, the host MUST reevaluate that
+inspection. Hosts MUST bound such reevaluation through documented native
+resource policy. A failure in one handler supplies no decision
+and MUST NOT cancel another handler's valid deny, discard its valid replacement,
+or override an unresolved native approval requirement. Handler composition
+MUST NOT turn a valid deny into delivery for this pending response delivery,
+including redelivery or reevaluation.
+
+### 5. Fail-open means inspection failure does not add a denial
+
+Preserve the existing [Core fail-open rule](../spec/0.1/core.md#fail-open-behavior):
+
+| Situation | Result |
+| --- | --- |
+| Valid allow without replacement | Deliver the evaluated body when other applicable decisions and native policies permit. |
+| Valid allow with replacement | Deliver the replacement under those same constraints. |
+| Valid deny | Withhold the body. |
+| Absent response, malformed JSON/schema, invalid replacement encoding, mismatched event ID/name, handler error, or timeout | No control result from that invocation; continue the pending delivery unless another applicable decision or independent native policy blocks it. |
+
+For example, with one handler and no other restriction, a timeout leaves the
+original buffered body eligible for delivery. A valid response denying delivery
+still blocks it. A failed invocation MUST NOT partially apply replacement data;
+the current buffer and valid decisions from other invocations remain intact.
+A structurally valid response without a decision likewise supplies no control
+result, even if it contains the replacement member.
+
+Fail-open does not promise that every delivered body was successfully scanned.
+Deployments requiring that stronger guarantee need an explicit native policy.
+It also does not authorize bypassing sandbox, organization, or user-approval
+restrictions. Common async members introduce no separate remote approval or
+buffer-retention protocol in this RFC.
+
+### 6. Capabilities, streaming, and resource limits
+
+The proposed registry makes `PostNetworkAccess` **Gate-capable for response
+delivery**, while retaining faithful terminal telemetry in `observe` mode.
+The controlled irreversible action is consumer access to the body; the network
+request has already finished. Update the Core and adapter rules accordingly:
+
+| Mode | Proposed Post behavior |
+| --- | --- |
+| `gate` | Report terminal results; for complete bodies offered for delivery, buffer them before consumer access and enforce valid delivery/replacement controls. Failure/interruption reports and results without a body offered for delivery remain observational. |
+| `observe` | Report the actual terminal network result using existing timing. Ignore all handler controls, even if complete content is available. |
+| `partial` | A related native signal cannot faithfully satisfy the declared semantics. Document the limitation and do not emit it as a normalized Core event. |
+| `unavailable` | No faithful terminal network event is available. |
+
+A streaming request still has one terminal occurrence when its body completes,
+fails, or is interrupted. This proposal defines no per-chunk inspection. A host
+that buffers an entire finite stream before any consumer access can provide
+`gate`. A host that delivers chunks as they arrive may still provide accurate
+terminal `observe` telemetry, but MUST NOT claim full-body delivery control.
+
+Capability declarations MUST describe their supported protocols, runtime paths,
+buffer limits, and disclosure restrictions. Within a configuration claiming
+`gate`, oversized bodies or unsupported paths MUST NOT silently fall back to
+uninspected streaming. A host may stop delivery under its declared native
+resource policy, or declare the configuration `observe`, `partial`, or
+`unavailable` as appropriate before use. It MUST NOT downgrade an in-flight
+Gate to bypass control. A buffer or decoding failure is a native failure;
+the pending delivery MUST stop with a native error. Report the actual network
+result without fabricating complete-body fields. Fail-open for handler failures
+does not authorize releasing an unrepresented body after such a native failure.
+Once a valid event is submitted, a handler's size-limit error follows fail-open.
+
+Full bodies may contain secrets or personal data. The host MUST select an
+authorized handler under its disclosure policy. If full bytes cannot be
+disclosed, use an authorized local handler or declare the capability limitation;
+do not silently redact the input and claim original-body enforcement. Base64
+does not encrypt content. Handlers MUST treat response content as untrusted data.
+
+### 7. Diagnostics
+
+A host SHOULD record the event, operation, recipient, and turn identifiers,
+the handler decision or failure class, and the actual delivery result. It
+SHOULD omit body content and sensitive metadata. An allow alone is not evidence
+that delivery occurred. No new audit event or ledger format is introduced.
+
+A body denial MUST NOT generate another network terminal occurrence or a
+fabricated `PermissionDenied`. Existing permission events apply only when the
+native permission boundary and all required identifiers are actually present.
 
 ## Illustrative exchange
 
-These examples describe the **candidate contract**. The new name is
-intentionally unsupported by the current 0.1 schemas. The body below is a
-complete four-byte synthetic response containing an ELF marker, not a
-truncated executable. The example policy prohibits such downloads; detecting
-an ELF marker alone does not establish that a real file is malicious.
+These examples describe the **candidate semantics**, not current main behavior.
+The existing schemas permit additional event and event-specific response members;
+structural validation does not mean an existing Observe host will apply them.
 
-The network request completed successfully:
+A complete synthetic text response contains the six bytes `secret`. The host
+has buffered it for one recipient and declares the revised Post `gate` contract:
 
 ```json
 {
@@ -333,139 +320,127 @@ The network request completed successfully:
   "protocol": "https",
   "outcome": "success",
   "status_code": 200,
-  "bytes_recv": 4
-}
-```
-
-The host still holds the body, and asks about its delivery:
-
-```json
-{
-  "spec": "agent-hooks/0.1",
-  "event_id": "018f6c3a-9214-7abc-9f12-34567890ab02",
-  "hook_event_name": "BeforeNetworkResponseDelivery",
-  "session_id": "session-42",
-  "timestamp": "2026-09-15T02:00:00Z",
-  "sequence": 51,
-  "prompt_id": "prompt-7",
-  "operation_id": "network-request-9",
-  "delivery_id": "body-delivery-1",
+  "bytes_recv": 6,
   "consumer_id": "consumer-agent-42",
-  "destination_host": "downloads.example.com",
-  "destination_port": 443,
-  "protocol": "https",
-  "status_code": 200,
-  "response_media_type": "application/octet-stream",
-  "response_body_base64": "f0VMRg=="
+  "response_media_type": "text/plain",
+  "response_body_base64": "c2VjcmV0"
 }
 ```
 
-The handler denies delivery, without rewriting the earlier network result:
+Option A: the handler allows replacement with the ten bytes `[REDACTED]`:
 
 ```json
 {
   "spec": "agent-hooks/0.1",
-  "event_id": "018f6c3a-9214-7abc-9f12-34567890ab02",
+  "event_id": "018f6c3a-9214-7abc-9f12-34567890ab01",
   "hookSpecificOutput": {
-    "hookEventName": "BeforeNetworkResponseDelivery",
-    "permissionDecision": "deny",
-    "permissionDecisionReason": "Executable downloads are not permitted by this policy."
+    "hookEventName": "PostNetworkAccess",
+    "permissionDecision": "allow",
+    "permissionDecisionReason": "Replace the sensitive text before delivery.",
+    "updatedResponseBodyBase64": "W1JFREFDVEVEXQ=="
   }
 }
 ```
 
-The host withholds the four body bytes and may return a safe local error or
-retain the body in a native quarantine. `PostNetworkAccess.outcome` remains
-`success`. Consumers must not interpret that network result as authorization
-to release the body.
+The host delivers `[REDACTED]` if remaining handlers and native policy permit.
+It retains network `outcome: "success"`, `status_code: 200`, and `bytes_recv: 6`.
+The replacement does not change how many body bytes the server transmitted.
+
+Alternatively, option B denies delivery of the same response:
+
+```json
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "018f6c3a-9214-7abc-9f12-34567890ab01",
+  "hookSpecificOutput": {
+    "hookEventName": "PostNetworkAccess",
+    "permissionDecision": "deny",
+    "permissionDecisionReason": "This response must not be delivered."
+  }
+}
+```
+
+These are alternative handler responses to one invocation, not two replies that
+must be combined. With option B the consumer receives no body bytes; the network
+result remains success. No additional network event is needed in either case.
 
 ## Compatibility impact
 
-The proposed change adds a nineteenth Core event in a future revision of the
-unaccepted 0.1 draft; it does not rename or change the control semantics of any
-existing event. Current schemas reject the proposed name, and existing handlers
-must not receive it until explicitly configured for an adopted revision.
-Keeping `spec: "agent-hooks/0.1"` while this draft remains unaccepted would not
-itself establish compatibility, as already documented by
-[RFC 0004](./0004-standard-lifecycle-events.md#compatibility-impact).
+This proposal keeps all 18 event names and reuses the existing envelope. It
+**changes an existing Observe contract** to permit response-delivery control.
+Current main requires controls on `PostNetworkAccess` to be ignored; adding
+content or a permission decision alone does not enable this behavior.
 
-If 0.1 is accepted before this proposal is decided, the versioning plan must
-be revisited through the RFC process rather than silently changing a published
-contract. There is no automatic handler discovery or negotiation in this RFC.
+Adopters MUST update the event registry, schemas, capability declarations, and
+host/handler configuration together for the adopted revision. They MUST enable
+the revised Post contract only for explicitly configured compatible hosts and
+handlers. An old telemetry handler's response MUST NOT silently acquire control
+authority. Keeping `spec: "agent-hooks/0.1"` during an unaccepted draft does not
+establish compatibility or automatic negotiation. Existing Observe mappings
+remain usable as Observe and gain no delivery-enforcement claim.
 
-Existing native quarantine code can remain in a vendor integration, but must
-identify its current behavior as native or proposed. It must not attribute
-that enforcement to a Core `PostNetworkAccess` response. No automatic Claude
-Code, NeMo Relay, or other host mapping is claimed; implementations must
-demonstrate a faithful before-delivery boundary.
+If 0.1 is accepted before this proposal is decided, revisit versioning through
+the RFC process before changing the published contract. Vendor-native quarantine
+or sanitization remains native until an adopted contract is implemented. No
+automatic Claude Code, NeMo Relay, or other runtime mapping is claimed.
 
 ## Security and privacy impact
 
-The Gate adds a portable point for preventing selected response bodies from
-reaching an agent, provided the host controls the full buffer. It cannot undo
-request-side disclosure or a remote action. It also cannot retract previously
-released streaming chunks or guarantee semantic safety after parsing.
+The proposal can prevent selected complete response bodies from reaching a
+consumer, or replace their content, when the host enforces the buffer boundary.
+It cannot retract previously delivered chunks, undo remote effects, or prove
+that a scan or replacement is semantically safe after parsing.
 
-Complete-body buffering and base64 increase memory, copying, and handler
-payload costs. Hosts need explicit resource and retention limits, authorized
-inspection endpoints, least-privilege access, and diagnostics that do not
-persist sensitive bodies. A quarantine must not itself become a readable
-backdoor to denied content. These are host responsibilities, not a required
-enterprise service or a security certification supplied by this RFC.
-
-Default fail-open, native-policy precedence, faithful byte binding, and honest
-capability declarations are required together. A deployment requiring all
-content to be successfully scanned before delivery needs a separate native
-policy covering handler failures and resource limits.
+Buffering, base64, and replacement increase memory and copying costs. Native
+resource limits, restricted quarantine storage, authorized inspection endpoints,
+and content-free diagnostics remain necessary host responsibilities. A valid
+replacement is an authorized content change, not a claim of preserved origin
+authenticity. Default fail-open remains part of the proposed contract.
 
 ## Alternatives considered
 
 | Alternative | Trade-off |
 | --- | --- |
-| Make `PostNetworkAccess` a Gate | Reuses a name, but changes an existing Observe contract, combines network outcome with delivery authorization, and cannot describe early-chunk inspection as a terminal result. A separate boundary preserves both meanings. |
-| Add only a vendor event | Enables experimentation under the existing extension policy and remains appropriate before adoption. It does not provide a shared delivery contract across vendors. |
-| Approve each streaming chunk | Reduces buffering latency, but introduces ordering, cross-chunk inspection, cancellation, and already-released-content semantics. It needs a separate proposal. |
-| Pass only a hash, prefix, or body reference | Reduces payload size, but does not give every handler the complete evaluated representation. Reference resolution, access, and lifetime would need an additional contract. |
-| Add body rewriting or a `quarantine` enum | Expands policy and storage semantics beyond withholding delivery. The existing `deny` decision is sufficient for this proposal. |
+| Add `BeforeNetworkResponseDelivery` | Preserves the existing Observe-only definition, but adds a third network event for a flow that the Pre/Post pair can cover. This proposal favors fewer event names and explicitly revises Post semantics. |
+| Keep Post strictly observational and use a vendor event | Supports experimentation before adoption, but offers no shared content-control behavior across hosts. |
+| Inspect each streaming chunk | Reduces buffering latency but requires cross-chunk, cancellation, and already-delivered-content rules. It is outside this full-body proposal. |
+| Reuse `updatedInput` or add `transform`/`quarantine` decisions | Obscures whether input or response bytes change, or mixes delivery decisions with storage policy. An explicit body replacement field plus existing permission decisions is sufficient. |
 
 ## Follow-up implementation and acceptance criteria
 
-After acceptance, a follow-up PR must update the canonical event registry,
-Core response and correlation rules, security and adapter guidance, root and
-published website schemas, fixtures, event counts, capability declarations,
-and examples together. It must add the new request variant and both schemas'
-event-name enumerations without relaxing existing request or response rules.
+After acceptance, a follow-up PR must update `spec/0.1/events.md` (including
+the registry and shared network/memory terminal rules), `core.md` response and
+capability rules, adapter/security guidance, root and published schemas,
+fixtures, and examples together. `PostMemoryWrite` stays Observe. The event
+enumerations and count remain 18. Schema rules must validate body/recipient
+field dependencies, success-only delivery fields, and replacement types;
+base64 validity and capability-dependent behavior also need semantic checks.
 
-Implementations and conformance guidance must cover at least the following
-cases. These are acceptance criteria, not claims of runtime tests executed by
-this proposal PR:
+These are future acceptance criteria, not runtime tests performed by this RFC:
 
 | Case | Required result |
 | --- | --- |
-| Complete text, binary, and empty bodies | Encode and expose the complete intended representation; a valid allow releases exactly those bytes when native policy permits. |
-| Valid deny | No body bytes reach the consumer, including via a readable temporary file or side channel owned by the adapter. |
-| Complete HTTP 403/500 body denied | Network Post remains `success`; delivery is separately denied. |
-| Both network Post and delivery Gate include a status | Their status codes match for the same operation; a local refusal cannot replace that status. |
-| Incomplete transfer | Report the actual network failure/interruption where supported; do not fabricate a complete-body Gate. |
-| Before-delivery observation without enforcement | Declare `observe`; do not report successful blocking by this hook. |
-| Previously released streaming chunk | Do not claim the complete-body Gate or emit a normalized event under a `partial` capability. |
-| Redacted, truncated, prefix-only, invalid-base64, or hash-only input | Do not treat it as a faithful complete-body event. |
-| Changed body or security-relevant metadata | Invalidate the prior decision and evaluate again before release. |
-| Attempt to release a previously denied body | Invoke a fresh Gate with new delivery and event IDs, even if the body is unchanged. |
-| Same body offered to a different consumer | Use that consumer's identity and a new delivery attempt; do not reuse the first consumer's allow. |
-| Handler invocation or reevaluation for the same attempt | Preserve delivery, consumer, and operation identities while assigning a fresh event ID. |
-| Runtime exposes only a decoded string or parsed object | Declare partial/unavailable; do not re-encode it and claim the required byte boundary. |
-| Redirect, retry, or redelivery | Preserve the specified request correlation; use distinct operation IDs for new requests and distinct event IDs for deliveries. |
-| Mismatched response event ID/name, malformed response, timeout, or error | No hook control result; follow Core fail-open and record a minimal diagnostic. |
-| Native policy denies despite handler allow | Keep delivery blocked. |
-| Native `ask` or `defer` | Retain the buffer while required native approval resolves; never treat defer as approval or assume consent on a non-interactive host. |
-| Buffer limits or an unsupported delivery path | Apply the declared native resource policy or capability limitation; do not silently bypass a claimed Gate. |
-| Denial auditing | Do not emit an extra network terminal event, rewrite its outcome, or invent a native permission denial. |
+| Complete text, binary, and empty body | A valid allow releases exactly the evaluated bytes, subject to other applicable decisions and native policy. |
+| Valid replacement, including an empty string | Deliver exactly the replacement; preserve original network facts and reconcile native delivery metadata. |
+| Replacement cannot be applied faithfully | Stop with a native error; do not expose the original body as a fallback. |
+| Valid deny, including complete HTTP 403/500 responses | Withhold content; keep the actual network outcome/status; emit no extra terminal occurrence. |
+| Valid replacement supplied without allow | No replacement effect; a valid deny remains a denial. |
+| Handler error, timeout, malformed replacement, or correlation mismatch | No control from that invocation; preserve the current buffer and other valid decisions, and apply fail-open/native policy. |
+| Multiple handlers | Present replacements to subsequent final-content inspectors; failures and later allows do not cancel valid denies. |
+| Network failure/interruption | Emit the actual terminal result with error; omit complete-body fields and ignore controls; do not release partial bytes under a full-body protection claim. |
+| Successful result with no body offered for delivery | Preserve terminal telemetry; omitted delivery fields confer no control or bypass permission. |
+| Existing Observe host or handler | Continue faithful telemetry, ignore control fields, and require explicit configuration before enabling revised Gate semantics. |
+| Already-delivered stream or decoded-object-only runtime | Claim only the faithful capability available; do not claim full-byte Gate protection. |
+| Redacted, truncated, prefix-only, or hash-only input | Do not label it a complete evaluated body. |
+| Changed body or repeated handler delivery | Reevaluate inapplicable inspections; retain the recipient, terminal occurrence, and network facts, using fresh event IDs. A valid deny remains a denial. |
+| Attempt to reuse a decision for another recipient or a later quarantine release | Do not authorize it through this request-continuation contract. |
+| Redirect or retry | A new request has a new operation ID; reevaluation is not a new network operation. |
+| Native policy denial, ask, or defer | Keep the body unavailable while required approval is unresolved; non-interactive ask is deny, and defer is not consent. |
+| Buffer limits and quarantine | Apply declared native policy; no silent streaming fallback or readable path to withheld bytes. |
 
-JSON Schema validation alone cannot establish that a host withheld bytes,
-preserved the evaluated buffer, applied the correct event-specific response,
-or maintained correlation across events. The follow-up must distinguish
-structural fixture checks from host semantic and integration tests.
+JSON Schema validation alone cannot prove timing, actual replacement, withheld
+bytes, or correct decision handling. Implementation verification must include
+host integration tests in addition to structural fixtures.
 
 ## References
 
@@ -477,13 +452,11 @@ structural fixture checks from host semantic and integration tests.
 - [Security considerations](../spec/0.1/security.md).
 - [Related enterprise integration proposal, PR #1](https://github.com/trendmicro/agent-hook-unity/pull/1).
 
-The receive-side inspection and quarantine use case arose during review of an
-enterprise governance integration. This RFC proposes the shared boundary and
-does not claim that any vendor has accepted, co-authored, or implemented it.
+The use case arose during review of an enterprise governance integration.
+This RFC does not claim vendor acceptance, co-authorship, or implementation.
 
 ## Decision record
 
-Pending. No formal review window, maintainer votes, or acceptance are recorded.
-The prerequisite Discussion and at least 14 calendar days of public review
-must be completed before a decision under repository governance. This draft
-does not supersede RFC 0004 or the remaining enterprise work in PR #1.
+Pending. The prerequisite Discussion, at least 14 calendar days of public
+review, and maintainer decision remain outstanding under repository governance.
+RFC 0004 remains the current definition until an adopted revision changes it.
