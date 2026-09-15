@@ -28,7 +28,7 @@ standard output is a useful non-normative adapter pattern.
 ## Event envelope
 
 An event MUST be a JSON object that validates against the
-[Hook Event schema](https://trendmicro.github.io/agent-hook-standard/schemas/0.1/hook-event.schema.json).
+[Hook Event schema](https://trendmicro.github.io/agent-hook-unity/schemas/0.1/hook-event.schema.json).
 The 0.1 document shape is deliberately Claude-shaped: the event discriminator
 is the flat `hook_event_name` member and Core event names are PascalCase. It is
 not a byte-for-byte Claude Code payload or response contract.
@@ -103,7 +103,7 @@ the event `partial` or `unavailable`, rather than `gate`.
 ## Response envelope
 
 A handler response MUST be a JSON object that validates against the
-[Hook Response schema](https://trendmicro.github.io/agent-hook-standard/schemas/0.1/hook-response.schema.json).
+[Hook Response schema](https://trendmicro.github.io/agent-hook-unity/schemas/0.1/hook-response.schema.json).
 It contains required `spec` and `event_id` members. `event_id` MUST equal the
 event's `event_id`; a response with a different identifier is invalid.
 

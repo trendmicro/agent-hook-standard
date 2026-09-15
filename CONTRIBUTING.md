@@ -15,7 +15,7 @@ and fixes.
 
 ## Discussing ideas and reporting issues
 
-Use [GitHub Discussions](https://github.com/trendmicro/agent-hook-standard/discussions)
+Use [GitHub Discussions](https://github.com/trendmicro/agent-hook-unity/discussions)
 for questions, ideas, use cases, and proposed changes to the Agent Hook Spec.
 Start a discussion before drafting an RFC so the community can help shape the
 proposal.
@@ -70,7 +70,7 @@ Do not report security-sensitive issues in a public GitHub issue. Follow
 
 ## Contact
 
-For questions, use [GitHub Discussions](https://github.com/trendmicro/agent-hook-standard/discussions)
+For questions, use [GitHub Discussions](https://github.com/trendmicro/agent-hook-unity/discussions)
 or contact a [maintainer](GOVERNANCE.md#active-maintainers).
 
 Thank you for helping make this specification clearer, more reliable, and more

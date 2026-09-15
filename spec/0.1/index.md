@@ -44,7 +44,7 @@ workflow is required. Older 0.1 schemas reject the new names; adopters must
 update schemas and capability declarations before using the revised draft.
 
 The original draft is proposed by
-[RFC 0001](https://github.com/trendmicro/agent-hook-standard/blob/main/rfcs/0001-agent-hook-core-event-contract.md).
+[RFC 0001](https://github.com/trendmicro/agent-hook-unity/blob/main/rfcs/0001-agent-hook-core-event-contract.md).
 The five-event expansion is proposed by
-[RFC 0004](https://github.com/trendmicro/agent-hook-standard/blob/main/rfcs/0004-standard-lifecycle-events.md).
+[RFC 0004](https://github.com/trendmicro/agent-hook-unity/blob/main/rfcs/0004-standard-lifecycle-events.md).
 Neither proposal has yet been accepted through the repository RFC process.

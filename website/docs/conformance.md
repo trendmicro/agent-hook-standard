@@ -2,11 +2,13 @@
 sidebar_position: 4
 ---
 
+import Link from '@docusaurus/Link';
+
 # Conformance
 
 Agent Hook 0.1 defines three conformance roles: event producer, handler, and
 adapter. The draft's normative requirements and role definitions are in the
-[core protocol](https://trendmicro.github.io/agent-hook-standard/specification/0.1/core).
+<Link to="/specification/0.1/core">core protocol</Link>.
 
 The repository validates the 0.1 event and response JSON Schemas against
 focused valid and invalid fixtures. Each schema uses JSON Schema Draft 2020-12,

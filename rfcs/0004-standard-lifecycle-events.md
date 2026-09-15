@@ -258,7 +258,7 @@ signature, or audit record is required.
 ### Informative references and attribution
 
 The selected network, memory, and configuration event concepts are adapted
-from Brian Chuang's [PR #1](https://github.com/trendmicro/agent-hook-standard/pull/1),
+from Brian Chuang's [PR #1](https://github.com/trendmicro/agent-hook-unity/pull/1),
 commit `4beb7b79190b3dfdfd85e42c2b53f71483b2db6c`. This proposal changes their
 scope, correlation, configuration representation, and capability requirements.
 It does not supersede the remaining work in that PR. RFC numbers 0002 and

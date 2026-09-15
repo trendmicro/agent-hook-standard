@@ -21,7 +21,7 @@ The repository contains an adoption-ready Agent Hook 0.1 draft proposed by
 standard events proposed by
 [RFC 0004](rfcs/0004-standard-lifecycle-events.md). It is not active until
 accepted through the RFC process. Join the
-[GitHub Discussions](https://github.com/trendmicro/agent-hook-standard/discussions)
+[GitHub Discussions](https://github.com/trendmicro/agent-hook-unity/discussions)
 to help shape it.
 
 ## Repository map

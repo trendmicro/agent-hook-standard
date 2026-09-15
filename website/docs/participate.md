@@ -12,4 +12,4 @@ an invalid fixture, or a failing build. Sensitive reports belong in the private
 channel described by the repository security policy.
 
 For contribution expectations, read
-[CONTRIBUTING.md](https://github.com/trendmicro/agent-hook-standard/blob/main/CONTRIBUTING.md).
+[CONTRIBUTING.md](https://github.com/trendmicro/agent-hook-unity/blob/main/CONTRIBUTING.md).
