@@ -40,21 +40,21 @@ an extension MAY expose related native data without claiming Core semantics.
 
 | `hook_event_name` | Exact lifecycle boundary | Required event-specific fields | Classification |
 | --- | --- | --- | --- |
-| `SessionStart` | When a host starts, resumes, clears, compacts, or forks a session context before subsequent agent work. | `source` | Observe |
+| `SessionStart` | When a host starts, resumes, clears, compacts, or forks a session context before subsequent agent work. | `source` | Gate |
 | `UserPromptSubmit` | After an external prompt is accepted, but before it affects agent execution. | `prompt`, `prompt_id` | Gate |
 | `BeforeModelRequest` | Immediately before a complete request is dispatched to a model provider. | `prompt_id`, `model_request_id`, `model`, `messages` | Gate |
-| `AfterModelResponse` | Once the terminal result of one complete model request is available. | `prompt_id`, `model_request_id`, `model`, `outcome`, and `response` on success or `error` otherwise | Observe |
+| `AfterModelResponse` | Once the terminal result of one complete model request is available. | `prompt_id`, `model_request_id`, `model`, `outcome`, and `response` on success or `error` otherwise | Gate |
 | `PreToolUse` | Immediately before a tool begins and before any effect of that invocation occurs. | `prompt_id`, `tool_name`, `tool_input`, `tool_use_id` | Gate |
 | `PermissionRequest` | At a native approval boundary, before the requested operation has been allowed or denied. | `prompt_id`, `permission_request_id`, `operation_id`, `operation` | Gate |
 | `PermissionDenied` | After a user, policy, handler, or host denies a requested operation. | `prompt_id`, `permission_request_id`, `operation_id`, `reason`, `denied_by` | Observe |
-| `PostToolUse` | After one tool invocation completes successfully. | `prompt_id`, `tool_name`, `tool_input`, `tool_response`, `tool_use_id` | Observe |
+| `PostToolUse` | After one tool invocation completes successfully. | `prompt_id`, `tool_name`, `tool_input`, `tool_response`, `tool_use_id` | Gate |
 | `PostToolUseFailure` | After one tool invocation fails or is interrupted. | `prompt_id`, `tool_name`, `tool_input`, `tool_use_id`, `error` | Observe |
 | `PreNetworkAccess` | Immediately before one application-level outbound request is dispatched, before its request bytes are sent. | `operation_id`, `prompt_id`, `destination_host`, `destination_port`, `protocol` | Gate |
-| `PostNetworkAccess` | At the terminal result of one started application-level outbound request. | `operation_id`, `prompt_id`, `destination_host`, `destination_port`, `protocol`, `outcome`, and `error` on failure or interruption | Observe |
+| `PostNetworkAccess` | At the terminal result of one started application-level outbound request. | `operation_id`, `prompt_id`, `destination_host`, `destination_port`, `protocol`, `outcome`, and `error` on failure or interruption | Gate |
 | `PreMemoryWrite` | Immediately before one durable agent-memory create, update, or upsert becomes persistent or visible. | `operation_id`, `prompt_id`, `memory_store_id`, `memory_key`, `content` | Gate |
 | `PostMemoryWrite` | At the terminal result of one started durable agent-memory write. | `operation_id`, `prompt_id`, `memory_store_id`, `memory_key`, `outcome`, and `error` on failure or interruption | Observe |
 | `PreConfigChange` | Before a change to effective agent behavior or capability configuration takes effect. | `operation_id`, `config_target`, `mutation_type`, plus `new_value` for create/update and `prompt_id` when turn-attributable | Gate |
-| `SubagentStart` | Before a child agent receives executable work. | `prompt_id`, `delegation_id`, `agent_id`, `agent_type`, `parent_agent_id` | Observe |
+| `SubagentStart` | Before a child agent receives executable work. | `prompt_id`, `delegation_id`, `agent_id`, `agent_type`, `parent_agent_id` | Gate |
 | `SubagentStop` | After a child agent reaches a terminal state. | `prompt_id`, `delegation_id`, `agent_id`, `agent_type`, `outcome` | Observe |
 | `Stop` | At the terminal boundary of a caller-initiated, prompt-scoped turn. | `prompt_id`, `outcome` | Observe |
 | `SessionEnd` | After final output, or after an observable abnormal session termination. | `reason` | Observe |
@@ -66,14 +66,21 @@ applicable start, resume, clear, compaction, or fork. `source` MUST identify
 the cause. Producers SHOULD use `startup`, `resume`, `clear`, `compact`,
 `fork`, or `other`; a richer native cause MAY be preserved in `extensions`.
 A change of model within an existing session MUST NOT be represented as
-`SessionStart`.
+`SessionStart`. When declared as `gate`, a host MUST evaluate handler
+permission decisions (`allow` or `deny`) before agent execution commences,
+enabling load-time sandbox and runtime integrity verification (such as
+prohibiting unauthorized library injection or suspicious proxy configurations).
 
 ### `UserPromptSubmit`
 
 A producer MUST emit `UserPromptSubmit` only after an external prompt has been
 accepted and before that prompt changes agent execution. `prompt_id` identifies
 the resulting prompt-scoped turn. A host that rejects input before accepting it
-MUST NOT represent that rejected input as `UserPromptSubmit`.
+MUST NOT represent that rejected input as `UserPromptSubmit`. When declared as
+`gate`, a handler MAY block the turn via `decision: "block"`, or provide
+`updatedPrompt` in `hookSpecificOutput` to perform surgical prompt rewriting
+(such as input guardrail tagging or credential redaction) without terminating
+the workflow.
 
 ### `BeforeModelRequest`
 
@@ -90,7 +97,13 @@ request result it observes. `model_request_id` MUST equal the identifier from
 the corresponding `BeforeModelRequest`. `outcome` MUST identify the terminal
 condition. A successful outcome MUST include `response`; a non-successful
 outcome MUST include `error`. A streaming delta, partial token, or display
-callback MUST NOT be represented as `AfterModelResponse`.
+callback MUST NOT be represented as `AfterModelResponse`. When declared as
+`gate` on non-streaming or buffered model execution, a handler MAY enforce
+permission decisions or supply `updatedResponse` in `hookSpecificOutput` to
+sanitize model outputs (such as removing phishing URLs, PII, or prompt leaks)
+before the response is rendered to users or appended to context. In raw
+unbuffered streaming mode where tokens have already been emitted, this event
+operates as `observe`.
 
 ### `PreToolUse`
 
@@ -125,6 +138,10 @@ A producer MUST emit `PostToolUse` after a tool invocation completes
 successfully. Its `tool_use_id` MUST equal the identifier on the corresponding
 `PreToolUse`, and `tool_response` MUST be the terminal result available to the
 host. `duration_ms` MAY be included when the host can calculate it faithfully.
+When declared as `gate`, handlers MAY evaluate handler permission decisions
+or provide `updatedOutput` in `hookSpecificOutput` to sanitize untrusted tool
+results (such as neutralizing indirect prompt injection payloads scraped from
+external data sources) before the result is incorporated into agent context.
 
 ### `PostToolUseFailure`
 
@@ -257,7 +274,10 @@ For `PostNetworkAccess` and `PostMemoryWrite`, `outcome` MUST be `success`,
 the existing `error` object with a nonempty string `type` and an optional
 string `message`. A `success` outcome MUST NOT include `error`. `duration_ms`
 MAY contain a non-negative number when the duration is accurately known.
-Hosts MUST ignore all response control fields for these Observe events.
+For `PostMemoryWrite`, hosts MUST ignore all response control fields. For
+`PostNetworkAccess`, when declared as `gate` on a buffered transport, handlers
+MAY provide control decisions (`allow`, `deny`) or replacement content
+(`updatedResponseBodyBase64`) before delivering the body to the application caller.
 
 A pre-operation denial MUST NOT produce either Post event as evidence of
 execution. Native permission telemetry MAY report that denial when the
@@ -271,7 +291,14 @@ does not prove that it had no effects.
 A producer MUST emit `SubagentStart` before the identified child agent receives
 executable work. `agent_id` identifies the child and `parent_agent_id`
 identifies its parent. `delegation_id` identifies this delegation, not merely
-the lifetime of the child process or agent instance.
+the lifetime of the child process or agent instance. When available,
+`delegation_depth` MUST indicate the zero-based hierarchical delegation depth
+(where 0 indicates the root agent and 1 indicates a direct child), and
+`delegation_chain` MUST list the ordered ancestor agent identifiers from root to
+parent, enabling handlers and hosts to enforce recursion limits and prevent runaway
+delegation. When declared as `gate`, a host MUST evaluate handler permission
+decisions (`allow` or `deny`) before dispatching work to the subagent, defending
+against confused-deputy escalation and multi-agent fork bombs.
 
 ### `SubagentStop`
 
@@ -303,6 +330,12 @@ or `unavailable`, not as a Gate. A response that permits an operation only
 passes the Agent Hook gate and MUST NOT override a native sandbox, organization
 policy, host policy, or user approval.
 
+A host MAY declare any Gate as `gate` (enabling control decisions) or as
+`observe` (telemetry only), based on host architecture, transport capabilities,
+and policy. When declared `gate`, the host MUST enforce the handler's control
+response; when declared `observe`, the host MUST ignore control members for
+enforcement purposes while retaining observational telemetry.
+
 An **Observe** event records a lifecycle boundary without making the event a
 portable control point. A host MUST NOT use a handler response to retroactively
 change an observed action while claiming conformance to this registry.
@@ -313,9 +346,10 @@ declaring `gate`, a decision applies only to the operation, target, and proposed
 values presented to the handler. If those change before dispatch or mutation,
 the host MUST evaluate the Gate again against the changed operation before
 proceeding. A host that cannot enforce this precondition MUST NOT claim `gate`.
-These events define no
-content-rewriting response: `updatedInput`, `updatedMessages`, and other
-undefined control members MUST have no control effect for these three Gates.
+For `PreMemoryWrite`, an optional `updatedContent` member in `hookSpecificOutput`
+MAY provide sanitized or redacted content to be stored in place of the proposed
+content. For `PreNetworkAccess` and `PreConfigChange`, content-rewriting controls
+have no effect.
 
 ## Correlation and ordering
 

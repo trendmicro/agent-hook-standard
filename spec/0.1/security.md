@@ -18,24 +18,28 @@ handler's gate. It MUST NOT bypass native approval, sandbox, organization,
 managed-policy, or platform restrictions. A refusal reason should be useful to
 the agent but MUST NOT expose secrets or protected policy details. A response
 that requests approval must use a host approval flow; non-interactive hosts MUST
-deny instead of assuming consent.
+deny instead of assuming consent, unless the host supports asynchronous turn
+suspension pending an out-of-band approval token.
 
 Only the gate events defined by the event registry may interpret a control
-response: `UserPromptSubmit`, `BeforeModelRequest`, `PreToolUse`,
-`PermissionRequest`, `PreNetworkAccess`, `PreMemoryWrite`, and
-`PreConfigChange`. A host MUST ignore a control response for any other
+response: `SessionStart`, `UserPromptSubmit`, `BeforeModelRequest`,
+`AfterModelResponse`, `PreToolUse`, `PermissionRequest`, `PostToolUse`,
+`PreNetworkAccess`, `PostNetworkAccess`, `PreMemoryWrite`, `PreConfigChange`,
+and `SubagentStart`. A host MUST ignore a control response for any other
 `hook_event_name` for control purposes. In particular, a control response
-returned for
-an event that reports a completed, failed, denied, or ended operation MUST NOT
-be represented as preventive enforcement.
+returned for an event classified as Observe (such as `PermissionDenied`,
+`PostToolUseFailure`, `SubagentStop`, `Stop`, or `SessionEnd`) MUST NOT be
+represented as preventive enforcement.
 
 The network, memory, and configuration Gates MUST apply the
 [request-mutation preconditions](./events.md#gate-and-observe-semantics): a
 decision cannot authorize a target or proposed value that changed after the
-handler evaluated it. Their responses define no content rewriting.
-`PreNetworkAccess` covers application request dispatch, not kernel-level
-enforcement or complete SSRF protection. A failed or interrupted network
-request or memory write can have partial effects; the
+handler evaluated it. For `PreMemoryWrite`, `updatedContent` permits surgical
+redaction before durable storage; for `PostNetworkAccess`, `updatedResponseBodyBase64`
+permits body replacement when declared as `gate`. `PreNetworkAccess` covers
+application request dispatch, not kernel-level enforcement or complete SSRF
+protection. A failed or interrupted network request or memory write can have
+partial effects; the
 [terminal-result rules](./events.md#network-and-memory-terminal-results) do not
 promise rollback. A configuration denial must prevent the pending mutation,
 not attempt to undo an effective change.

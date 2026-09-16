@@ -39,7 +39,13 @@
       "minimum": 0
     },
     "decision": {
-      "const": "block"
+      "enum": [
+        "allow",
+        "deny",
+        "ask",
+        "defer",
+        "block"
+      ]
     },
     "reason": {
       "type": "string",
@@ -58,6 +64,14 @@
   "allOf": [
     {
       "if": {
+        "properties": {
+          "decision": {
+            "enum": [
+              "deny",
+              "block"
+            ]
+          }
+        },
         "required": [
           "decision"
         ]
@@ -151,6 +165,25 @@
         "updatedInput": {
           "type": "object",
           "additionalProperties": true
+        },
+        "updatedPrompt": {
+          "type": "string"
+        },
+        "updatedResponse": {
+          "anyOf": [
+            { "type": "string" },
+            { "type": "object", "additionalProperties": true }
+          ]
+        },
+        "updatedOutput": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "updatedContent": {
+          "type": "string"
+        },
+        "updatedResponseBodyBase64": {
+          "type": "string"
         },
         "updatedMessages": {
           "type": "array",
