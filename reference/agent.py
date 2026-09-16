@@ -487,7 +487,7 @@ class AgentRuntime:
         cwd: str = "/workspace",
         host_fingerprint: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Gate 1: SessionStart / SessionInit (Environment Sanitization & Sandbox Integrity)."""
+        """Gate 1: SessionStart (Environment Sanitization & Sandbox Integrity)."""
         env = environment_vars or {}
         payload = {
             "source": source,

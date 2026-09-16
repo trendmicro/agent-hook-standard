@@ -290,7 +290,7 @@ class SecurityPolicyEngine:
         )
 
     def evaluate_session_start(self, payload: Dict[str, Any]) -> UniversalDecisionResponse:
-        """Gate 1: SessionStart / SessionInit (Environment Sanitization & Sandbox Integrity)."""
+        """Gate 1: SessionStart (Environment Sanitization & Sandbox Integrity)."""
         env_vars = payload.get("environment_vars", {})
         # Check for host library injection or rogue proxy hijacking
         for k, v in env_vars.items():
@@ -616,7 +616,7 @@ class SecurityReceiver:
             decision_resp = self.policy_engine.evaluate_pre_network_access(event_payload)
         elif event_type == "UserPromptSubmit":
             decision_resp = self.policy_engine.evaluate_user_prompt_submit(event_payload)
-        elif event_type in ("SessionStart", "SessionInit"):
+        elif event_type == "SessionStart":
             decision_resp = self.policy_engine.evaluate_session_start(event_payload)
         elif event_type in ("BeforeModelRequest", "PreModelCall"):
             decision_resp = self.policy_engine.evaluate_before_model_request(event_payload)

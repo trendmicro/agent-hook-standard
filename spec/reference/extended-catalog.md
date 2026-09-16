@@ -29,7 +29,7 @@ While the Core Agent Hook specification focuses on the **Twelve Critical Cyberse
 
 ### Domain 1: Session & Lifecycle Boundary
 1. **`Setup`** (⚪ General): Fired during environment initialization before session startup (mode: `init`, `maintenance`, `clean`). Validates lockfile hashes (`package-lock.json`).
-2. **`SessionStart` / `SessionInit`** (🔴 **Gate 1**): Fired when runtime initializes session. Inspects environment variables (`LD_PRELOAD`, rogue proxies), host fingerprint, and IdP token claims.
+2. **`SessionStart`** (🔴 **Gate 1**): Fired when runtime initializes session. Inspects environment variables (`LD_PRELOAD`, rogue proxies), host fingerprint, and IdP token claims.
 3. **`SessionEnd`** (⚪ General): Fired when session terminates (`user_exit`, `inactivity_timeout`, `fatal_error`, `policy_revoked`).
 
 ### Domain 2: Ingress & User Intent

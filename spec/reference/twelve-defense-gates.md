@@ -8,7 +8,7 @@ The **Twelve Cybersecurity Defense Gates** constitute the core perimeter defense
 +----------------------------------------------------------------------------------------------------+
 |                               THE TWELVE CYBERSECURITY DEFENSE GATES                               |
 +------------------------------------+---------------------------------------------------------------+
-| Ingress & Planning Perimeter       | 1. SessionStart / SessionInit (Environment Sanitization)      |
+| Ingress & Planning Perimeter       | 1. SessionStart (Environment Sanitization)                    |
 |                                    | 2. UserPromptSubmit (Prompt Injection & Jailbreak Defense)   |
 |                                    | 3. BeforeModelRequest / PreModelCall (Egress DLP & Guardrails)|
 |                                    | 4. AfterModelResponse / PostModelCall (Hallucination Defense) |
@@ -29,7 +29,7 @@ The **Twelve Cybersecurity Defense Gates** constitute the core perimeter defense
 
 ## Gate-by-Gate Specification
 
-### Gate 1: `SessionStart` / `SessionInit` (Environment & Sandbox Integrity)
+### Gate 1: `SessionStart` (Environment & Sandbox Integrity)
 * **Lifecycle Boundary**: Fired before any execution begins in a session context.
 * **Threat Model**: Host container breakout, `LD_PRELOAD` library injection, malicious `HTTP_PROXY` redirects, and unauthenticated tenant escalation.
 * **Input Fields**: `source`, `cwd`, `environment_vars`, `host_fingerprint`, `actor`, `idp_token_claims`.
