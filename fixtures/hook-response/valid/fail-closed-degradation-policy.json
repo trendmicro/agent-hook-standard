@@ -1,0 +1,24 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "47d3c093-2e5d-4ed3-bf6c-b76240712852",
+  "decision": "deny",
+  "reason": "Security policy requires fail-closed enforcement on uninspected tool execution during PDP timeout.",
+  "extensions": {
+    "sec.enterprise.degradation": {
+      "profile_version": "1.0",
+      "mode": "strict_fail_closed",
+      "applicable_gates": [
+        "PreToolUse",
+        "PreNetworkAccess",
+        "PreMemoryWrite"
+      ],
+      "applicable_failures": [
+        "timeout",
+        "transport_error",
+        "http_server_error",
+        "native_validation_failure"
+      ],
+      "audit_alert": true
+    }
+  }
+}

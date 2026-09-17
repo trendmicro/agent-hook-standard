@@ -62,14 +62,17 @@ The following capabilities are classified as **Tier 2 (Enterprise Extension Prof
 |                                                                                                   |
 |  [ TIER 2: Enterprise Extension Profiles ] (Optional Profiles via extensions[...])               |
 |                                                                                                   |
-|   1. Zero-Trust Wire Signing    2. Tamper-Evident Ledger     3. Asynchronous HITL   4. TOCTOU Guard |
-|      (sec.enterprise.crypto)      (sec.enterprise.audit)      (sec.enterprise.hitl)  (sec.enterprise.integrity) |
+|   1. Zero-Trust Wire Signing    2. Tamper-Evident Ledger     3. Asynchronous HITL                 |
+|      (sec.enterprise.crypto)      (sec.enterprise.audit)      (sec.enterprise.hitl)               |
+|                                                                                                   |
+|   4. TOCTOU Integrity Guard     5. Failure & Degradation Enforcement                              |
+|      (sec.enterprise.integrity)   (sec.enterprise.degradation)                                    |
 |                                                                                                   |
 +---------------------------------------------------------------------------------------------------+
 |                                                                                                   |
 |  [ TIER 3: Control-Plane Management ] (Out-of-band Administrative Channel)                         |
 |                                                                                                   |
-|   5. Emergency Administrative Kill Switch (x-nemo/SessionRevoke or POST /sessions/{id}/revoke)    |
+|   6. Emergency Administrative Kill Switch (x-nemo/SessionRevoke or POST /sessions/{id}/revoke)    |
 |                                                                                                   |
 +---------------------------------------------------------------------------------------------------+
 ```
@@ -82,7 +85,8 @@ The following capabilities are classified as **Tier 2 (Enterprise Extension Prof
 | **2. Tamper-Evident Audit Ledger** | Hash-chained records (`prev_record_hash`) providing forensic non-repudiation. | Imposes sequencing and storage overhead unsuitable for stateless lambdas/microservices. | Optional profile under `extensions["sec.enterprise.audit"]`. |
 | **3. Asynchronous HITL Suspension** | Async suspension with signed resumption tokens (`ApprovalGrantToken`) via Slack/Teams. | Involves long-lived state queues and callback channels beyond Core synchronous request/response. | Optional profile under `extensions["sec.enterprise.hitl"]`. |
 | **4. TOCTOU Integrity Verification** | Compares payload hash between approval time and execution time. | Application-level invariant check rather than lifecycle dispatch primitive. | Optional profile under `extensions["sec.enterprise.integrity"]`. |
-| **5. Emergency Session Revocation** | Out-of-band administrative command to immediately sever agent network & revoke grants. | Control-plane operation, fundamentally distinct from inside-out agent data-plane lifecycle events. | Out-of-band control endpoint (`POST /sessions/{id}/revoke`) or namespaced event `x-nemo/SessionRevoke`. |
+| **5. Failure & Degradation Enforcement** | Enforces fail-closed or bounded-open degradation under handler outage, timeout, or validation rejection. | Core 0.1 mandates baseline fail-open to preserve agent availability without defining complex failure state machines. | Optional profile under `extensions["sec.enterprise.degradation"]` or host capability metadata. |
+| **6. Emergency Session Revocation** | Out-of-band administrative command to immediately sever agent network & revoke grants. | Control-plane operation, fundamentally distinct from inside-out agent data-plane lifecycle events. | Out-of-band control endpoint (`POST /sessions/{id}/revoke`) or namespaced event `x-nemo/SessionRevoke`. |
 
 ---
 
@@ -242,7 +246,82 @@ Defends against Time-of-Check to Time-of-Use (TOCTOU) payload swapping attacks b
 
 ---
 
-### 4. Control-Plane Operation: SessionRevoke Emergency Kill Switch
+### Extension Profile 5: Failure & Degradation Enforcement (`sec.enterprise.degradation`)
+
+#### Motivation & Threat Model
+
+While Core 0.1 specifies a baseline **fail-open** policy under handler errors or timeouts (to ensure lightweight, local, or experimental agents do not break unexpectedly), enterprise environments and regulated deployments operate under a Zero-Trust threat model:
+- If a security policy handler, network proxy, or credential vault times out or crashes, allowing an unvetted `PreToolUse`, `PreNetworkAccess`, or `PreMemoryWrite` operation to proceed creates severe breach and prompt injection exposure.
+- Conversely, an unconditional fail-closed policy across non-critical events could cause unnecessary availability outages during brief network jitter.
+
+To resolve this conflict without breaking Core 0.1 minimalism, this profile establishes an opt-in degradation specification that defines:
+1. **Precise Failure Classes** that trigger degradation.
+2. **Deterministic Enforcement Modes** (`strict_fail_closed`, `bounded_open`, `fail_open_monitored`).
+3. **Bounded-Open Circuit Breakers** with defined state transitions and exhaustion thresholds.
+4. **Explicit Precedence** over the Core 0.1 fail-open default.
+
+#### Recommended Payload Structure
+
+This profile MAY be declared in the host's capability metadata or attached to hook responses to configure degradation rules per gate:
+
+```json
+{
+  "extensions": {
+    "sec.enterprise.degradation": {
+      "profile_version": "1.0",
+      "mode": "bounded_open",
+      "applicable_gates": [
+        "PreToolUse",
+        "PreNetworkAccess",
+        "PreMemoryWrite",
+        "SubagentStart"
+      ],
+      "applicable_failures": [
+        "timeout",
+        "transport_error",
+        "http_server_error",
+        "malformed_response",
+        "native_validation_failure"
+      ],
+      "bounded_open_policy": {
+        "max_consecutive_failures": 3,
+        "window_seconds": 60,
+        "cooldown_seconds": 300,
+        "on_exhausted": "fail_closed"
+      },
+      "audit_alert": true
+    }
+  }
+}
+```
+
+#### Specification of Parameters
+
+* **`mode`** *(string, required)*:
+  - `"strict_fail_closed"`: Any failure in `applicable_failures` for a covered Gate results in immediate operation denial (`decision: "deny"`) and aborts the pending turn.
+  - `"bounded_open"`: Allows up to `max_consecutive_failures` within `window_seconds`. If failures exceed the bound, the circuit trips to `on_exhausted` (default: `"fail_closed"`).
+  - `"fail_open_monitored"`: Follows the Core 0.1 fail-open behavior, but generates high-priority security telemetry and audit events.
+* **`applicable_gates`** *(array of strings, optional)*: List of Core Gate names to which this enforcement applies. Defaults to all Gates declared by the host.
+* **`applicable_failures`** *(array of strings, required)*:
+  - `"timeout"`: Handler fails to reply before `timeout_ms` expires.
+  - `"transport_error"`: Connection refusal, DNS resolution failure, or TCP connection reset.
+  - `"http_server_error"`: Webhook or proxy responds with HTTP 5xx status codes.
+  - `"malformed_response"`: Response body fails JSON parsing, schema validation, or signature verification.
+  - `"native_validation_failure"`: Schema-valid mutated payload (e.g. `updatedInput`, `updatedPrompt`) is rejected by the host runtime's native validation.
+* **`bounded_open_policy`** *(object, optional)*:
+  - **`max_consecutive_failures`** *(integer, minimum: 1)*: Maximum allowed consecutive failures before tripping.
+  - **`window_seconds`** *(integer, minimum: 1)*: Rolling evaluation window in seconds.
+  - **`cooldown_seconds`** *(integer, minimum: 1)*: Time period the circuit remains tripped before attempting half-open recovery.
+  - **`on_exhausted`** *(string, enum: `["fail_closed", "require_interactive_approval"]`)*: Action to take once the bound is exhausted.
+* **`audit_alert`** *(boolean, optional, default: `true`)*: When `true`, emits an enterprise audit record or alert for every degraded event.
+
+#### Precedence Rule against Core 0.1
+
+When `sec.enterprise.degradation` is configured on a host or returned by an enterprise PDP, its rules **MUST take precedence** over Core 0.1 default fail-open behavior for all gates listed in `applicable_gates`. If an unlisted Gate fails, it falls back to the Core 0.1 baseline.
+
+---
+
+### 5. Control-Plane Operation: SessionRevoke Emergency Kill Switch
 
 #### Distinction between Data Plane and Control Plane
 
@@ -401,6 +480,40 @@ The following JSON Schemas illustrate how implementations may validate extension
     "bound_tool_hash": { "type": "string" }
   },
   "required": ["challenge_id"],
+  "additionalProperties": true
+}
+```
+
+### A.4 Failure & Degradation Profile (`sec.enterprise.degradation`)
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EnterpriseDegradationExtension",
+  "type": "object",
+  "properties": {
+    "profile_version": { "type": "string" },
+    "mode": { "type": "string", "enum": ["strict_fail_closed", "bounded_open", "fail_open_monitored"] },
+    "applicable_gates": { "type": "array", "items": { "type": "string" } },
+    "applicable_failures": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["timeout", "transport_error", "http_server_error", "malformed_response", "native_validation_failure"]
+      }
+    },
+    "bounded_open_policy": {
+      "type": "object",
+      "properties": {
+        "max_consecutive_failures": { "type": "integer", "minimum": 1 },
+        "failure_rate_threshold": { "type": "number", "minimum": 0, "maximum": 1 },
+        "window_seconds": { "type": "integer", "minimum": 1 },
+        "cooldown_seconds": { "type": "integer", "minimum": 1 },
+        "on_exhausted": { "type": "string", "enum": ["fail_closed", "require_interactive_approval"] }
+      }
+    },
+    "audit_alert": { "type": "boolean" }
+  },
+  "required": ["mode", "applicable_failures"],
   "additionalProperties": true
 }
 ```

@@ -33,7 +33,8 @@ and schemas do not yet implement it.
 opt-in architectural strategy and recommended extension profiles for
 enterprise-grade security capabilities (cryptographic wire signing,
 tamper-evident audit ledgers, asynchronous HITL suspension, TOCTOU payload
-integrity, and administrative session revocation). It preserves Core 0.1
+integrity, failure and degradation enforcement like fail-closed and bounded-open,
+and administrative session revocation). It preserves Core 0.1
 minimalism and interoperability while offering standard integration blueprints
 for enterprise PEPs (e.g. NeMo Relay) and PDPs (e.g. Trend Micro Vision One).
 
