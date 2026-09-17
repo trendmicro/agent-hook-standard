@@ -120,6 +120,29 @@ async function validateSchemasAndFixtures() {
       }
     }
   }
+
+  const markdownFiles = await filesUnder(root, (file) => file.endsWith('.md'));
+  for (const file of markdownFiles) {
+    const content = await readFile(file, 'utf8');
+    const blocks = Array.from(content.matchAll(/```(?:json)\n([\s\S]*?)\n```/g));
+    for (let i = 0; i < blocks.length; i++) {
+      let parsed;
+      try {
+        parsed = JSON.parse(blocks[i][1]);
+      } catch {
+        continue;
+      }
+      if (parsed && typeof parsed === 'object' && parsed.spec === 'agent-hooks/0.1') {
+        const isEvent = Boolean(parsed.hook_event_name);
+        const schemaName = isEvent ? 'hook-event' : 'hook-response';
+        const validate = schemas.get(schemaName);
+        if (validate && !validate(parsed)) {
+          const details = ajv.errorsText(validate.errors, { separator: '; ' });
+          errors.push(`${path.relative(root, file)} (JSON block ${i + 1}) failed validation against ${schemaName}.schema.json: ${details}`);
+        }
+      }
+    }
+  }
 }
 
 await validateMarkdownLinks();

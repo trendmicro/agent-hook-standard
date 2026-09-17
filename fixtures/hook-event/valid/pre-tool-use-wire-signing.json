@@ -2,29 +2,22 @@
   "spec": "agent-hooks/0.1",
   "event_id": "8f2ab3e1-4c5d-4e6f-8a9b-0c1d2e3f4a5b",
   "hook_event_name": "PreToolUse",
-  "session_id": "session-42",
+  "session_id": "sess_production_9981",
   "timestamp": "2026-09-17T02:30:00Z",
   "sequence": 4,
-  "cwd": "/workspace/project",
-  "prompt_id": "prompt-17",
-  "tool_name": "Bash",
+  "prompt_id": "prompt-9981",
+  "tool_use_id": "toolu-9981-bash",
+  "tool_name": "bash",
   "tool_input": {
-    "command": "git status --short"
+    "command": "uname -a"
   },
-  "tool_use_id": "toolu-17",
   "extensions": {
     "sec.enterprise.crypto": {
       "key_id": "key_enclave_prod_01",
       "algorithm": "ed25519",
       "canonical_algorithm": "RFC8785_JCS",
       "canonical_hash": "sha256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069",
-      "signature": "MEQCIE3b2r19xL0...signature_base64..."
-    },
-    "sec.enterprise.audit": {
-      "sequence": 4,
-      "prev_record_hash": "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0",
-      "record_hash": "f8e7d6c5b4a3928170efdcba9876543210fedcba0987654321abcdef01234567",
-      "tamper_evident_status": "verified"
+      "signature": "MEQCIE...base64_encoded_signature..."
     }
   }
 }

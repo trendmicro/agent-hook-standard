@@ -115,10 +115,13 @@ Used to guarantee message authenticity and provenance between Agent, PEP (Relay)
 ```json
 {
   "spec": "agent-hooks/0.1",
-  "event_id": "01J8ABCDEF1234567890abcdef",
+  "event_id": "8f2ab3e1-4c5d-4e6f-8a9b-0c1d2e3f4a5b",
   "hook_event_name": "PreToolUse",
   "session_id": "sess_production_9981",
   "timestamp": "2026-09-17T02:30:00Z",
+  "sequence": 4,
+  "prompt_id": "prompt-9981",
+  "tool_use_id": "toolu-9981-bash",
   "tool_name": "bash",
   "tool_input": {
     "command": "uname -a"
@@ -183,7 +186,7 @@ Standardizes asynchronous human intervention when a Policy Decision Point return
 ```json
 {
   "spec": "agent-hooks/0.1",
-  "event_id": "01J8ABCDEF1234567891abcdef",
+  "event_id": "36c2b982-1d4c-4dc2-ae5b-a65139601741",
   "decision": "ask",
   "reason": "Execution of bash shell with root privilege requires administrator sign-off.",
   "extensions": {
@@ -198,12 +201,12 @@ Standardizes asynchronous human intervention when a Policy Decision Point return
 }
 ```
 
-##### Resumption Callback Request (Triggered by Slack/Teams Approval)
-When approved by an authorized administrator, the enterprise PDP or callback service invokes the PEP resumption endpoint with an authorized grant token:
+##### Correlated Resumption Response (Triggered by Slack/Teams Approval)
+When human approval resolves out-of-band, the enterprise PDP or callback service delivers an asynchronous correlated response matching the original `event_id` (`36c2b982-1d4c-4dc2-ae5b-a65139601741`) to the host or PEP resumption endpoint:
 ```json
 {
   "spec": "agent-hooks/0.1",
-  "event_id": "01J8ABCDEF1234567892abcdef",
+  "event_id": "36c2b982-1d4c-4dc2-ae5b-a65139601741",
   "decision": "allow",
   "reason": "Approved by security administrator Alice.",
   "extensions": {
@@ -299,7 +302,7 @@ This profile MAY be declared in the host's capability metadata or attached to ho
 
 * **`mode`** *(string, required)*:
   - `"strict_fail_closed"`: Any failure in `applicable_failures` for a covered Gate results in immediate operation denial (`decision: "deny"`) and aborts the pending turn.
-  - `"bounded_open"`: Allows up to `max_consecutive_failures` within `window_seconds`. If failures exceed the bound, the circuit trips to `on_exhausted` (default: `"fail_closed"`).
+  - `"bounded_open"`: Follows the deterministic circuit breaker state machine defined below. When failures reach `max_consecutive_failures`, the circuit trips to `on_exhausted`. Requires `bounded_open_policy`.
   - `"fail_open_monitored"`: Follows the Core 0.1 fail-open behavior, but generates high-priority security telemetry and audit events.
 * **`applicable_gates`** *(array of strings, optional)*: List of Core Gate names to which this enforcement applies. Defaults to all Gates declared by the host.
 * **`applicable_failures`** *(array of strings, required)*:
@@ -308,12 +311,50 @@ This profile MAY be declared in the host's capability metadata or attached to ho
   - `"http_server_error"`: Webhook or proxy responds with HTTP 5xx status codes.
   - `"malformed_response"`: Response body fails JSON parsing, schema validation, or signature verification.
   - `"native_validation_failure"`: Schema-valid mutated payload (e.g. `updatedInput`, `updatedPrompt`) is rejected by the host runtime's native validation.
-* **`bounded_open_policy`** *(object, optional)*:
+* **`bounded_open_policy`** *(object, required when `mode` is `"bounded_open"`)*:
   - **`max_consecutive_failures`** *(integer, minimum: 1)*: Maximum allowed consecutive failures before tripping.
   - **`window_seconds`** *(integer, minimum: 1)*: Rolling evaluation window in seconds.
-  - **`cooldown_seconds`** *(integer, minimum: 1)*: Time period the circuit remains tripped before attempting half-open recovery.
+  - **`cooldown_seconds`** *(integer, minimum: 1)*: Time period the circuit remains tripped before entering `HALF_OPEN`.
   - **`on_exhausted`** *(string, enum: `["fail_closed", "require_interactive_approval"]`)*: Action to take once the bound is exhausted.
 * **`audit_alert`** *(boolean, optional, default: `true`)*: When `true`, emits an enterprise audit record or alert for every degraded event.
+
+#### Deterministic Circuit Breaker State Machine
+
+When `mode` is `"bounded_open"`, the host or PEP MUST implement the circuit breaker as a deterministic finite-state machine (FSM) governed by the following rules:
+
+1. **Counter Scope & Keying**:
+   - State and failure counters MUST be isolated and keyed per **`[gate, handler_id]`** within the agent session (or `[host_id, gate, handler_id]` for multi-tenant gateways). A failure at one tool hook handler MUST NOT trip or affect another hook handler.
+2. **Success & Reset Rule**:
+   - In state `CLOSED`: When a handler invocation succeeds (receives a valid correlated response within `timeout_ms`), the consecutive failure counter is immediately **reset to 0**, and any prior failures outside the rolling window are pruned.
+   - In state `HALF_OPEN`: A single successful probe invocation immediately **resets the counter to 0** and transitions the circuit back to `CLOSED`.
+3. **Trip Point (Failure $N$)**:
+   - The circuit transitions from `CLOSED` to `TRIPPED` **on failure $N$**, where $N = \text{max\_consecutive\_failures}$ recorded within the trailing `window_seconds`. The $N$-th failing operation and all subsequent arrivals are subjected to `on_exhausted`.
+4. **Rolling-Window Calculation**:
+   - The rolling window tracks failure timestamps $\{t_1, t_2, \dots\}$. Timestamps older than $(T_{\text{now}} - \text{window\_seconds})$ are pruned continuously.
+5. **Half-Open Probing & Concurrent Arrival**:
+   - When the circuit is `TRIPPED` and $(T_{\text{now}} - T_{\text{trip}} \ge \text{cooldown\_seconds})$, the circuit transitions to `HALF_OPEN`.
+   - In `HALF_OPEN`, the host allows **exactly one (1) probe invocation** to be dispatched to the handler.
+   - **Concurrency behavior**: If concurrent operations arrive while a probe is in-flight, the host MUST NOT dispatch additional probes to the degraded handler; concurrent operations MUST immediately evaluate `on_exhausted`.
+   - If the probe succeeds: State transitions to `CLOSED`.
+   - If the probe fails: State transitions back to `TRIPPED`, resets $T_{\text{trip}} = T_{\text{now}}$, and applies `on_exhausted`.
+6. **Persistence & Restart**:
+   - The state machine is maintained in-memory by default. Upon process restart, the circuit initializes to `CLOSED` unless persistent backing storage (e.g. Redis) is explicitly configured.
+7. **Interactive Fallback**:
+   - If `on_exhausted` is `"require_interactive_approval"` but the host environment is non-interactive or headless, the host **MUST fallback to `fail_closed`** (`decision: "deny"`).
+
+##### State Transition Table
+
+| Current State | Event / Condition | Next State | Operation Gating Action |
+| :--- | :--- | :--- | :--- |
+| `CLOSED` | Handler invocation succeeds | `CLOSED` | Reset consecutive failure counter to 0; allow operation. |
+| `CLOSED` | Handler failure; total failures $< N$ in window | `CLOSED` | Increment counter; fail-open (allow operation); emit audit alert. |
+| `CLOSED` | Handler failure; total failures $= N$ in window | `TRIPPED` | Record trip time $T_{\text{trip}}$; apply `on_exhausted` (deny operation). |
+| `TRIPPED` | New operation; $T_{\text{now}} - T_{\text{trip}} < \text{cooldown}$ | `TRIPPED` | Apply `on_exhausted` (deny operation); do not dispatch to handler. |
+| `TRIPPED` | $T_{\text{now}} - T_{\text{trip}} \ge \text{cooldown}$ | `HALF_OPEN` | Transition to `HALF_OPEN`; prepare single probe. |
+| `HALF_OPEN` | First operation arrives | `HALF_OPEN` | Dispatch single probe request to handler. |
+| `HALF_OPEN` | Concurrent operation arrives while probe in flight | `HALF_OPEN` | Apply `on_exhausted` (deny operation); do not dispatch extra probe. |
+| `HALF_OPEN` | Probe succeeds | `CLOSED` | Reset failure counter & window to 0; allow operation. |
+| `HALF_OPEN` | Probe fails | `TRIPPED` | Reset $T_{\text{trip}} = T_{\text{now}}$; apply `on_exhausted` (deny operation). |
 
 #### Precedence Rule against Core 0.1
 
@@ -347,21 +388,23 @@ Implementations MAY support administrative revocation through either:
    ```
 2. **Namespaced Extension Event**:
    On internal event buses, implementations MAY emit an extension event adhering to `spec/0.1/events.md`:
-   ```json
-   {
-     "spec": "agent-hooks/0.1",
-     "event_id": "01J8ABCDEF1234567893abcdef",
-     "hook_event_name": "x-nemo/SessionRevoke",
-     "session_id": "sess_production_9981",
-     "timestamp": "2026-09-17T02:35:00Z",
-     "extensions": {
-       "sec.enterprise.control": {
-         "action": "terminate",
-         "reason": "Administrative kill-switch invoked by SOC"
-       }
-     }
-   }
-   ```
+
+```json
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "9f3bc4e2-5d6e-4f7a-9b0c-1d2e3f4a5b6c",
+  "hook_event_name": "x-nemo/SessionRevoke",
+  "session_id": "sess_production_9981",
+  "timestamp": "2026-09-17T02:35:00Z",
+  "sequence": 100,
+  "extensions": {
+    "sec.enterprise.control": {
+      "action": "terminate",
+      "reason": "Administrative kill-switch invoked by SOC"
+    }
+  }
+}
+```
 
 Upon receiving a valid revocation command, the PEP/Host MUST:
 - Invalidate all active tokens and standing authorizations associated with `session_id`.
@@ -505,15 +548,27 @@ The following JSON Schemas illustrate how implementations may validate extension
       "type": "object",
       "properties": {
         "max_consecutive_failures": { "type": "integer", "minimum": 1 },
-        "failure_rate_threshold": { "type": "number", "minimum": 0, "maximum": 1 },
         "window_seconds": { "type": "integer", "minimum": 1 },
         "cooldown_seconds": { "type": "integer", "minimum": 1 },
         "on_exhausted": { "type": "string", "enum": ["fail_closed", "require_interactive_approval"] }
-      }
+      },
+      "required": ["max_consecutive_failures", "window_seconds", "cooldown_seconds", "on_exhausted"],
+      "additionalProperties": true
     },
     "audit_alert": { "type": "boolean" }
   },
   "required": ["mode", "applicable_failures"],
+  "allOf": [
+    {
+      "if": {
+        "properties": { "mode": { "const": "bounded_open" } },
+        "required": ["mode"]
+      },
+      "then": {
+        "required": ["bounded_open_policy"]
+      }
+    }
+  ],
   "additionalProperties": true
 }
 ```
