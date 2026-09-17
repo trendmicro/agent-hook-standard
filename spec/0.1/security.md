@@ -35,11 +35,11 @@ The network, memory, and configuration Gates MUST apply the
 [request-mutation preconditions](./events.md#gate-and-observe-semantics): a
 decision cannot authorize a target or proposed value that changed after the
 handler evaluated it. For `PreMemoryWrite`, `updatedContent` permits surgical
-redaction before durable storage; for `PostNetworkAccess`, `updatedResponseBodyBase64`
-permits body replacement when declared as `gate`. `PreNetworkAccess` covers
-application request dispatch, not kernel-level enforcement or complete SSRF
-protection. A failed or interrupted network request or memory write can have
-partial effects; the
+redaction before durable storage. For `PostNetworkAccess`, gating controls response
+delivery before caller access; response body replacement is deferred to RFC 0005.
+`PreNetworkAccess` covers application request dispatch, not kernel-level
+enforcement or complete SSRF protection. A failed or interrupted network request
+or memory write can have partial effects; the
 [terminal-result rules](./events.md#network-and-memory-terminal-results) do not
 promise rollback. A configuration denial must prevent the pending mutation,
 not attempt to undo an effective change.

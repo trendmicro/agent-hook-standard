@@ -30,9 +30,8 @@ Capability and outcome are different: a `gate` declaration does not mean every
 operation is denied, and an `observe` declaration is not a dry-run enforcement
 mode. The baseline response-failure default remains
 <Link to="/specification/0.1/core#fail-open-behavior">fail open</Link>.
-A host MAY also declare an optional `failure_mode` (`open`, `closed`, or `bounded_open`)
-for each declared Gate to communicate its degradation behavior under handler timeout
-or communication failure.
+Alternative degradation behaviors (such as fail-closed enforcement profiles)
+are deferred to dedicated profile RFCs.
 
 ## Suggested report information
 

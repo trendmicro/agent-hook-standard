@@ -4,6 +4,8 @@
   "decision": "allow",
   "hookSpecificOutput": {
     "hookEventName": "AfterModelResponse",
-    "updatedResponse": "Here is the sanitized architecture report without internal IPs [REDACTED]."
+    "updatedResponse": {
+      "content": "Here is the sanitized architecture report without internal IPs [REDACTED]."
+    }
   }
 }

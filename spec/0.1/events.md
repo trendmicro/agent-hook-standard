@@ -96,14 +96,17 @@ A producer MUST emit exactly one `AfterModelResponse` for each terminal model
 request result it observes. `model_request_id` MUST equal the identifier from
 the corresponding `BeforeModelRequest`. `outcome` MUST identify the terminal
 condition. A successful outcome MUST include `response`; a non-successful
-outcome MUST include `error`. A streaming delta, partial token, or display
-callback MUST NOT be represented as `AfterModelResponse`. When declared as
-`gate` on non-streaming or buffered model execution, a handler MAY enforce
-permission decisions or supply `updatedResponse` in `hookSpecificOutput` to
-sanitize model outputs (such as removing phishing URLs, PII, or prompt leaks)
-before the response is rendered to users or appended to context. In raw
-unbuffered streaming mode where tokens have already been emitted, this event
-operates as `observe`.
+outcome MUST include `error`. A streaming delta, partial token, or display callback MUST NOT be represented
+as `AfterModelResponse`. Capability declarations for this event are scoped to
+the host's configuration and transport. A configuration that may expose tokens or
+partial output to users or agent context before hook evaluation MUST declare this
+event `observe`. A host MAY declare `gate` only for configurations where all model
+output is retained and buffered until the hook decision resolves. When declared
+as `gate`, a handler MAY enforce permission decisions (`allow` or `deny`) or
+supply `updatedResponse` in `hookSpecificOutput` to sanitize model outputs (such
+as removing phishing URLs, PII, or prompt leaks) before the response is rendered
+to users or appended to session context. In unbuffered streaming configurations
+where tokens have already been emitted, this event MUST operate as `observe`.
 
 ### `PreToolUse`
 
@@ -276,8 +279,10 @@ string `message`. A `success` outcome MUST NOT include `error`. `duration_ms`
 MAY contain a non-negative number when the duration is accurately known.
 For `PostMemoryWrite`, hosts MUST ignore all response control fields. For
 `PostNetworkAccess`, when declared as `gate` on a buffered transport, handlers
-MAY provide control decisions (`allow`, `deny`) or replacement content
-(`updatedResponseBodyBase64`) before delivering the body to the application caller.
+MAY provide control decisions (`allow`, `deny`) to govern whether the completed
+response content is delivered to the application caller. A `deny` decision prevents
+delivery of the received response to the caller. Response payload body inspection
+and base64-encoded body replacement semantics are deferred to RFC 0005.
 
 A pre-operation denial MUST NOT produce either Post event as evidence of
 execution. Native permission telemetry MAY report that denial when the

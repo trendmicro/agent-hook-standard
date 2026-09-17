@@ -170,21 +170,19 @@
           "type": "string"
         },
         "updatedResponse": {
-          "anyOf": [
-            { "type": "string" },
-            { "type": "object", "additionalProperties": true }
-          ]
+          "type": "object",
+          "properties": {
+            "content": {},
+            "tool_calls": { "type": "array", "items": {} },
+            "finish_reason": { "type": "string" }
+          },
+          "additionalProperties": true
         },
         "updatedOutput": {
           "type": "object",
           "additionalProperties": true
         },
-        "updatedContent": {
-          "type": "string"
-        },
-        "updatedResponseBodyBase64": {
-          "type": "string"
-        },
+        "updatedContent": {},
         "updatedMessages": {
           "type": "array",
           "items": {}
