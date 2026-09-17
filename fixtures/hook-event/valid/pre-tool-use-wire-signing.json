@@ -1,0 +1,23 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "8f2ab3e1-4c5d-4e6f-8a9b-0c1d2e3f4a5b",
+  "hook_event_name": "PreToolUse",
+  "session_id": "sess_production_9981",
+  "timestamp": "2026-09-17T02:30:00Z",
+  "sequence": 4,
+  "prompt_id": "prompt-9981",
+  "tool_use_id": "toolu-9981-bash",
+  "tool_name": "bash",
+  "tool_input": {
+    "command": "uname -a"
+  },
+  "extensions": {
+    "sec.enterprise.crypto": {
+      "key_id": "key_enclave_prod_01",
+      "algorithm": "ed25519",
+      "canonical_algorithm": "RFC8785_JCS",
+      "canonical_hash": "sha256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069",
+      "signature": "MEQCIE...base64_encoded_signature..."
+    }
+  }
+}
