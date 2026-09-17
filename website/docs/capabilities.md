@@ -28,8 +28,10 @@ control, rather than which similarly named callbacks it offers.
 
 Capability and outcome are different: a `gate` declaration does not mean every
 operation is denied, and an `observe` declaration is not a dry-run enforcement
-mode. The current response-failure default remains
+mode. The baseline response-failure default remains
 <Link to="/specification/0.1/core#fail-open-behavior">fail open</Link>.
+Alternative degradation behaviors (such as fail-closed enforcement profiles)
+are deferred to dedicated profile RFCs.
 
 ## Suggested report information
 
@@ -45,6 +47,7 @@ additional required wire fields.
 | Execution scope | Which native operations reach the adapter, including any hidden SDK retries, provider-hosted tools, background work, or delegated agents. |
 | Native source and boundary | The callback or instrumentation used, when it runs relative to effects, and how required fields are obtained. |
 | Correlation | Where delivery, turn, model, tool, operation, approval, and delegation IDs originate and how related events retain them. |
+| Failure mode | Optional degradation behavior under handler timeout (`open`, `closed`, or `bounded_open`). |
 | Privacy limitations | Redaction or unavailable data that prevents faithful observation or decision-making at the claimed boundary. |
 | Evidence | Named tests, traces, or an implementation review tied to the host and adapter version. State whether each check passed, failed, was not run, or was not applicable, with a reason. |
 | Open issues | Missing evidence and mapping limitations, with an owner or follow-up reference where available. |

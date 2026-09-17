@@ -109,33 +109,69 @@ event's `event_id`; a response with a different identifier is invalid.
 
 The response MAY contain the Claude-shaped common members `continue`,
 `stopReason`, `systemMessage`, `terminalSequence`, `suppressOutput`, `async`,
-`asyncTimeout`, `metadata`, and `extensions`. It MAY contain top-level
-`decision: "block"`, but no top-level `allow`, `deny`, or `ask` value exists.
-When top-level `decision` is present, `reason` is REQUIRED.
+`asyncTimeout`, `metadata`, and `extensions`.
 
-`hookSpecificOutput`, when present, MUST contain `hookEventName` equal to the
-request's `hook_event_name`. Its control members are event-specific. They MUST
-NOT be interpreted as a universal response decision.
+To establish clean architectural separation between the **control plane**
+(authorization decisions) and the **data plane** (surgical payload mutations),
+a handler responding to a Gate with control or mutation intent MUST provide a
+top-level `decision` (`allow`, `deny`, `ask`, `defer`, or legacy `block`) and an
+optional `reason` (REQUIRED when `decision` is `deny` or `block`). Omission of a
+top-level `decision` is valid only for passive observation / metadata responses
+or as a legacy compatibility fallback. When a top-level `decision` is present,
+it is canonical and the host MUST ignore legacy nested control fields
+(`permissionDecision`, `permissionDecisionReason`, and nested `decision.behavior`
+within `hookSpecificOutput`). When no payload mutation is required,
+`hookSpecificOutput` MAY be omitted entirely.
 
-| Core Gate | Control response | Effect |
-| --- | --- | --- |
-| `UserPromptSubmit` | Top-level `decision: "block"` with `reason`. | Prevents the accepted prompt from changing agent execution. |
-| `BeforeModelRequest` | `hookSpecificOutput.permissionDecision`, optional `permissionDecisionReason`, and optional `updatedMessages`. | The permission decision controls the pre-dispatch request; `updatedMessages` replaces the messages at that boundary. |
-| `PreToolUse` | `hookSpecificOutput.permissionDecision`, optional `permissionDecisionReason`, and optional `updatedInput`. | The permission decision controls the proposed tool use; `updatedInput` replaces the tool input at that boundary. |
-| `PermissionRequest` | `hookSpecificOutput.decision.behavior`, with optional `updatedInput`, `updatedPermissions`, `message`, and `interrupt`. | The nested behavior controls the native approval request. |
-| `PreNetworkAccess`, `PreMemoryWrite`, `PreConfigChange` | `hookSpecificOutput.permissionDecision` and optional `permissionDecisionReason`. | The permission decision controls the pending request, write, or configuration mutation; these events define no content-rewriting controls. |
+When payload rewriting or event-specific output is needed, `hookSpecificOutput`
+MUST contain `hookEventName` matching the request, and MAY provide the applicable
+surgical rewrite member (`updatedPrompt`, `updatedInput`, `updatedResponse`,
+`updatedOutput`, `updatedContent`). For backward compatibility with earlier
+handlers, a host MUST also accept `permissionDecision` and `permissionDecisionReason`
+inside `hookSpecificOutput` only when top-level `decision` is omitted.
 
-For `BeforeModelRequest`, `PreToolUse`, `PreNetworkAccess`, `PreMemoryWrite`,
-and `PreConfigChange`, `permissionDecision` is one of
-`allow`, `deny`, `ask`, or `defer`. For `PermissionRequest`, nested
-`decision.behavior` is `allow` or `deny`. An `allow` only passes that hook's
-native gate; it MUST NOT override sandbox, organization, managed-policy, or
-user-approval restrictions.
+| Core Gate | Canonical control response | Data plane rewrite support (`hookSpecificOutput`) | Effect |
+| --- | --- | --- | --- |
+| `SessionStart` | `decision: "allow"` or `"deny"` | None. | Controls whether session initialization may proceed before agent work starts. |
+| `UserPromptSubmit` | `decision: "allow"`, `"deny"`, or legacy `"block"` | `updatedPrompt` | `deny` or `block` prevents prompt execution; `allow` with `updatedPrompt` surgically replaces prompt content. |
+| `BeforeModelRequest` | `decision: "allow"`, `"deny"`, `"ask"`, or `"defer"` | `updatedMessages` | Controls complete model request; `updatedMessages` replaces messages dispatched to provider. |
+| `AfterModelResponse` | `decision: "allow"` or `"deny"` | `updatedResponse` | Controls model response before UI rendering or context ingestion (when declared `gate`); `updatedResponse` replaces model output. Controls delivery and rendering, not inference rollback. |
+| `PreToolUse` | `decision: "allow"`, `"deny"`, `"ask"`, or `"defer"` | `updatedInput` | Controls tool invocation; `updatedInput` replaces tool parameters before execution. |
+| `PermissionRequest` | `decision: "allow"` or `"deny"` (or nested `decision.behavior`) | `updatedInput`, `updatedPermissions` | Controls native approval request. |
+| `PostToolUse` | `decision: "allow"` or `"deny"` | `updatedOutput` | Controls completed tool output before context ingestion (when declared `gate`); `updatedOutput` sanitizes result before ingestion. Controls ingestion into agent context, not tool execution rollback. |
+| `PreNetworkAccess` | `decision: "allow"`, `"deny"`, `"ask"`, or `"defer"` | None. | `deny` prevents pending outbound application request. |
+| `PostNetworkAccess` | `decision: "allow"` or `"deny"` | None. | Controls delivery of completed response content to the application caller (when declared `gate` on buffered transport); `deny` prevents response delivery. Controls delivery to caller, not network rollback. Response body inspection and rewriting are deferred to RFC 0005. |
+| `PreMemoryWrite` | `decision: "allow"`, `"deny"`, `"ask"`, or `"defer"` | `updatedContent` | `deny` prevents durable write; `updatedContent` replaces content persisted to memory store. |
+| `PreConfigChange` | `decision: "allow"`, `"deny"`, `"ask"`, or `"defer"` | None. | `deny` prevents pending effective configuration mutation. |
+| `SubagentStart` | `decision: "allow"` or `"deny"` | None. | Controls child agent delegation before executable work is dispatched. |
 
-For the three new Gates, `deny` MUST prevent the pending operation. `ask` MUST
-use the existing native approval flow; a non-interactive host MUST treat it as
-`deny`. `defer` leaves resolution to native approval or policy and MUST NOT
-count as approval. No asynchronous escalation or approval token is defined.
+An `allow` only passes that hook's native gate; it MUST NOT override sandbox,
+organization, managed-policy, or user-approval restrictions.
+
+For Post Gates (`AfterModelResponse`, `PostToolUse`, `PostNetworkAccess`), the
+controlled effect is strictly delivery to the caller, rendering to the user, or
+ingestion into session context. Gating a Post event MUST NOT be interpreted as
+rolling back, undoing, or compensating for the already-completed model inference,
+tool execution, or network transaction.
+
+For Gates supporting `ask`, `ask` represents pending authorization. The portable
+contract requires that the operation MUST NOT execute or deliver until approval
+resolves. If the host is interactive, it delegates to the host approval flow. If
+the host is non-interactive and lacks a native suspension mechanism, it MUST
+treat `ask` as `deny`. A host supporting asynchronous turn suspension MAY suspend
+the turn awaiting approval. Token format, token issuance, expiration, replay
+protection, persistence, and resumption APIs are host- or profile-specific
+mechanisms and are not defined as an interoperable wire protocol in Core 0.1.
+`defer` leaves resolution to native approval or policy and MUST NOT count as
+approval.
+
+When a handler supplies a schema-valid data-plane rewrite (`updatedPrompt`,
+`updatedInput`, `updatedResponse`, `updatedOutput`, `updatedContent`), the host
+MUST apply its native validation rules before committing the mutated value. If the
+replacement fails native validation, the host MUST fail closed (terminating the
+turn or treating the decision as `deny`) and MUST NOT silently fall back to the
+unredacted original value, which could reintroduce sensitive data or prompt
+injections.
 The [event registry](./events.md#gate-and-observe-semantics) defines their
 request-mutation preconditions and which response members have no control
 effect.
@@ -260,6 +296,9 @@ A host MUST NOT fabricate a Core event to improve its declaration. It MUST NOT
 declare `gate` when the native timing is post-effect, a response cannot be
 enforced, redaction removes the security-relevant information needed for the
 declared boundary, or the event registry classifies the event as Observe.
+Core 0.1 normatively adheres to the [fail-open rule](#fail-open-behavior)
+under handler error or timeout. Alternative degradation behaviors (such as
+fail-closed enforcement profiles) are deferred to dedicated profile RFCs.
 
 Core membership standardizes event names and semantics; it does not require a
 host to implement every event. Per-event obligations apply to the capabilities

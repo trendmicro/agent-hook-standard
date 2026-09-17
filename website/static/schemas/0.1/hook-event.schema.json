@@ -477,7 +477,12 @@
               "delegation_id": { "type": "string", "minLength": 1 },
               "agent_id": { "type": "string", "minLength": 1 },
               "agent_type": { "type": "string", "minLength": 1 },
-              "parent_agent_id": { "type": "string", "minLength": 1 }
+              "parent_agent_id": { "type": "string", "minLength": 1 },
+              "delegation_depth": { "type": "integer", "minimum": 0 },
+              "delegation_chain": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              }
             },
             "required": ["prompt_id", "delegation_id", "agent_id", "agent_type", "parent_agent_id"]
           }

@@ -1,0 +1,18 @@
+{
+  "spec": "agent-hooks/0.1",
+  "event_id": "4ceaa9fe-0d13-45ab-b3a0-303f2e7757a9",
+  "hook_event_name": "SubagentStart",
+  "session_id": "session-42",
+  "timestamp": "2026-09-09T10:15:25Z",
+  "sequence": 9,
+  "cwd": "/workspace/project",
+  "prompt_id": "prompt-17",
+  "delegation_id": "delegation-17",
+  "agent_id": "subagent-17",
+  "agent_type": "Explore",
+  "parent_agent_id": "main",
+  "delegation_depth": 1,
+  "delegation_chain": [
+    "main"
+  ]
+}
