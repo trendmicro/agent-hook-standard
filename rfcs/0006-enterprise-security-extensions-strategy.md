@@ -149,6 +149,27 @@ Alternatively, transport-level implementations MAY transport this metadata via H
 Hook-Signature: key_id="key_enclave_prod_01", alg="ed25519", sig="MEQCIE..."
 ```
 
+##### Canonicalization, Preimage, and Verification Semantics
+
+To ensure consistent interoperability across distinct runtime languages (Python, Go, TypeScript) and implementations without signature mismatch:
+
+1. **Canonicalization & Encoding**: Implementations MUST canonicalize payloads using **RFC 8785 (JSON Canonicalization Scheme - JCS)** and encode to UTF-8.
+2. **Exact Signed Object & Exclusion**:
+   - The signing input is formed from the complete Agent Hook event (or response) document.
+   - The self-referential signature property (`extensions["sec.enterprise.crypto"].signature`) and `canonical_hash` (if present) MUST be excluded prior to canonicalization.
+3. **Domain Separator & Preimage**:
+   - The preimage MUST be prefixed with a strict profile/version domain separation string:
+     `agent-hooks/0.1:sec.enterprise.crypto:v1\n`
+   - The complete byte sequence for signing and verification is:
+     $$\text{PREIMAGE\_BYTES} = \text{"agent-hooks/0.1:sec.enterprise.crypto:v1\n"} \,||\, \text{JCS}(\text{payload\_without\_sig})$$
+   - `canonical_hash` is computed as `<hash_algo>:<hex_digest>` over $\text{PREIMAGE\_BYTES}$.
+4. **Replay & Freshness Binding**:
+   - The payload MUST include a valid ISO-8601 `timestamp` and a unique UUID `event_id`.
+   - The receiver MUST assert that `timestamp` is within the allowable clock-skew window (recommended: $\pm 300\text{ seconds}$) and that `event_id` has not been observed within the active replay cache.
+5. **Key ID Resolution & Verification Failure**:
+   - `key_id` is resolved against the host or PEP's authorized local keystore, JWKS, or PKI trust anchors.
+   - If `key_id` is missing, unknown, or revoked, or if cryptographic verification fails, the PEP/Host **MUST reject the event (`fail_closed` / `decision: "deny"`)** and emit a high-priority security alert.
+
 ---
 
 #### 3.2 Profile: Tamper-Evident Audit Ledger (`sec.enterprise.audit`)
@@ -175,6 +196,18 @@ Enables forensic verification of agent operation history using back-linked hash 
 * **`record_hash`** *(string, required)*: Hex-encoded hash of the current record including `prev_record_hash`.
 * **`hash_algorithm`** *(string, optional, default: `"sha256"`)*: Hash algorithm used (`"sha256"`, `"sha3-512"`, `"blake3"`).
 * **`tamper_evident_status`** *(string, optional)*: State evaluation by the verification point (`"verified"`, `"broken_chain"`, `"unverified"`).
+
+##### Ledger Chain Lifecycle, Scope, and Anchors
+
+1. **Chain Scope & Isolation**: Hash chains MUST be scoped and isolated per `session_id`. A multi-agent or multi-session host MUST NOT interleave sequences across distinct sessions.
+2. **Genesis Value**: For the first event in a session (`sequence: 0`), `prev_record_hash` MUST be set to 64 hexadecimal ASCII zeros (`"0000000000000000000000000000000000000000000000000000000000000000"`).
+3. **Preimage Calculation**:
+   - `record_hash` is computed as:
+     $$\text{record\_hash} = \text{HASH}(\text{prev\_record\_hash} \,||\, \text{JCS}(\text{record\_body}))$$
+     where `record_body` contains the canonicalized event payload excluding `record_hash` and `tamper_evident_status`.
+4. **Verification Anchors & Session Rotation**:
+   - Upon `SessionEnd` (or sequence rollover), the terminal `record_hash` SHOULD be anchored to external immutable/append-only storage (e.g. WORM storage, Transparency Log, or signed ledger checkpoint).
+   - If verification detects a hash mismatch at any sequence step, `tamper_evident_status` is marked `"broken_chain"` and administrative audit alerts are triggered.
 
 ---
 
@@ -226,6 +259,32 @@ When human approval resolves out-of-band, the enterprise PDP or callback service
 * **`approval_grant_token`** *(string, optional)*: Cryptographically signed single-use grant token.
 * **`expires_at`** *(integer, optional)*: Unix epoch timestamp indicating expiration of the approval challenge.
 
+##### HITL Grant & Resumption Security Contract
+
+To ensure human authorization cannot be replayed, forged, or decoupled from the exact suspended operation:
+
+1. **Standardized Resumption Grant (Signed or Opaque with Introspection)**:
+   The `approval_grant_token` delivered upon resumption MUST represent cryptographically verifiable authorization via either:
+   - **Signed Grant (JWS/JWT)**: A compact JWS token (RFC 7515) signed by the authorized HITL Policy Decision Point.
+   - **Opaque Grant with Token Introspection**: An opaque reference string validated via an authenticated PDP token introspection endpoint (RFC 7662 style) returning the required claims.
+2. **Mandatory Bound Claims**:
+   Both formats MUST bind the following claims:
+   - `iss` *(string, required)*: Identifier of the authorized HITL authority.
+   - `aud` *(string, required)*: Identifier of the target Agent host or PEP.
+   - `sub` *(string, required)*: The original suspended `event_id` (e.g. `"36c2b982-1d4c-4dc2-ae5b-a65139601741"`).
+   - `sid` *(string, required)*: The session identifier (`session_id`).
+   - `tool` *(string, required)*: The tool name being authorized (`tool_name`).
+   - `input_hash` *(string, required)*: Hex-encoded `SHA-256(RFC8785_JCS(tool_input))` representing the exact parameters displayed to and approved by the human.
+   - `exp` *(integer, required)*: Expiration timestamp in seconds since Unix epoch.
+   - `jti` *(string, required)*: Globally unique grant ID for atomic single-use tracking.
+   - `approver` *(string, optional)*: Identity of the approving operator (e.g. email or employee ID).
+3. **Host Resumption Verification & Replay Protection**:
+   When the correlated resumption response arrives at the PEP:
+   - **Freshness Check**: Assert $(T_{\text{now}} \le \text{exp})$. If expired, reject resumption (`decision: "deny"`).
+   - **Context Binding**: Assert that `sub == event_id`, `sid == session_id`, and `tool == tool_name` match the currently suspended turn.
+   - **Content Integrity Binding**: Recompute `SHA-256(RFC8785_JCS(tool_input))` against the pending tool execution parameters and assert exact match with `input_hash`. If arguments were altered during turn suspension, the host MUST reject execution (`decision: "deny"`).
+   - **Atomic Single-Use**: The host MUST atomically verify and mark `jti` as consumed. Any duplicate arrival with the same `jti` MUST be rejected as a replay attack.
+
 ---
 
 #### 3.4 Profile: TOCTOU Content Fingerprint (`sec.enterprise.integrity`)
@@ -247,6 +306,13 @@ Defends against Time-of-Check to Time-of-Use (TOCTOU) payload swapping attacks b
 * **`content_identity`** *(string, required)*: Cryptographic hash of the serialized tool input arguments (`tool_input`).
 * **`enforce_toctou_pre_dispatch`** *(boolean, optional, default: `true`)*: Instructs the PEP/host to verify that the executed parameters match `content_identity` identically prior to invocation.
 
+##### Canonical Serialization & Payload Rewrite Semantics
+
+1. **Canonical Serialization**: `content_identity` MUST be generated as `"sha256:"` concatenated with lowercase hex of `SHA-256(RFC8785_JCS(tool_input))`.
+2. **Behavior After Payload Rewrite**:
+   - If an authorized `PreToolUse` hook handler legitimately modifies `tool_input` (e.g. parameter sanitization or credential injection), the rewriting handler **MUST recompute** and provide the updated `content_identity` alongside the mutated payload.
+   - If an unauthorized handler modifies parameters, or if the dispatched parameters do not match `content_identity` immediately prior to execution, the host PEP **MUST abort dispatch (`decision: "deny"`)** with `reason: "TOCTOU integrity violation: parameters modified post-authorization"`.
+
 ---
 
 ### Extension Profile 5: Failure & Degradation Enforcement (`sec.enterprise.degradation`)
@@ -265,7 +331,7 @@ To resolve this conflict without breaking Core 0.1 minimalism, this profile esta
 
 #### Recommended Payload Structure
 
-This profile MAY be declared in the host's capability metadata or attached to hook responses to configure degradation rules per gate:
+This profile is authoritative when declared in host or administrator preconfiguration, or dynamically provisioned via authenticated control-plane policy channels:
 
 ```json
 {
@@ -356,9 +422,21 @@ When `mode` is `"bounded_open"`, the host or PEP MUST implement the circuit brea
 | `HALF_OPEN` | Probe succeeds | `CLOSED` | Reset failure counter & window to 0; allow operation. |
 | `HALF_OPEN` | Probe fails | `TRIPPED` | Reset $T_{\text{trip}} = T_{\text{now}}$; apply `on_exhausted` (deny operation). |
 
+#### Trust Model & Policy Lifecycle
+
+1. **Authoritative Provisioning Channel & Authorized Issuer**:
+   - The authoritative degradation policy MUST be established by **Host / Administrator Preconfiguration** (e.g. local configuration files, environment variables, or host deployment manifests).
+   - In distributed deployments, the host MAY accept degradation policies provisioned dynamically by an authorized Policy Administration Point (PAP) or Policy Decision Point (PDP) via an authenticated control-plane channel (e.g. mTLS or cryptographically signed policy bundle).
+   - **Precedence & Security Invariant**: An ordinary, unauthenticated hook handler responding to tool or lifecycle events MUST NOT be permitted to downgrade or overwrite an administrator's degradation policy (e.g., a failing handler cannot unilaterally switch the host from `strict_fail_closed` to `fail_open_monitored`). Hook responses MAY only report policy state or request a degradation policy if the issuer is explicitly authenticated as possessing administrative policy authority.
+2. **Bootstrap Behavior**:
+   - When an agent host boots with no preconfigured degradation policy and no cached policy from an authorized PAP, it defaults to the Core 0.1 baseline (fail-open for handler errors with standard error logging), unless booted in an `enterprise-strict` profile which defaults to `strict_fail_closed` for all mutating gates.
+3. **Persistence, Expiry, Replacement, and Revocation**:
+   - Policies dynamically provisioned by an authorized PAP MAY declare `ttl_seconds` or `expires_at`. Upon expiration, the host evicts the cached policy and falls back to host bootstrap defaults.
+   - An administrator or authorized PAP MAY revoke or replace a degradation policy at any time via control-plane push or administrative event (`x-nemo/SessionRevoke`), which takes effect immediately for all subsequent gate evaluations.
+
 #### Precedence Rule against Core 0.1
 
-When `sec.enterprise.degradation` is configured on a host or returned by an enterprise PDP, its rules **MUST take precedence** over Core 0.1 default fail-open behavior for all gates listed in `applicable_gates`. If an unlisted Gate fails, it falls back to the Core 0.1 baseline.
+When `sec.enterprise.degradation` is configured on a host or provisioned by an authorized enterprise PDP, its rules **MUST take precedence** over Core 0.1 default fail-open behavior for all gates listed in `applicable_gates`. If an unlisted Gate fails, it falls back to the Core 0.1 baseline.
 
 ---
 
